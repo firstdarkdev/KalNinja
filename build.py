@@ -6,13 +6,10 @@ import tkinter
 from os import walk
 from tkinter import filedialog
 
-outputs = []
-output_names = []
 no_image = False
-
+disk_links = dict()
 compiler_path = "Compiler/C64Ass.exe"
 imager_path = ""
-
 arguments_length = len(sys.argv)
 
 argument_index = 0
@@ -47,42 +44,36 @@ print("Compiling code...")
 
 def compile(path):
     for (dir_path, dir_names, file_names) in os.walk(path):
+        files_for_disk = []
         for file in file_names:
             if (file.endswith(".asm")):
-                source = path + file
-                destination = file
+                source = dir_path + "/" + file
 
-                destination = destination.rstrip(".asm")
-                final = destination
+                destination = file.rstrip(".asm")
                 destination += ".prg"
 
-                build_location = "Build/PRGs/" + path + destination
+                build_location = "Build/PRGs/" + dir_path.lstrip(path) + "/" + destination
 
-                outputs.append(build_location)
-                output_names.append(final)
+                files_for_disk.append(build_location)
 
                 subprocess.run([compiler_path, source, "-f", "CBM", "-o", build_location])
+        if (len(files_for_disk) > 0):
+            disk_name = dir_path.rstrip("/")
+            disk_links[disk_name.lstrip(path)] = files_for_disk
 
-code_path = "Code/"
-graphics_path = "Graphics/"
-maps_path = "Maps/"
-sounds_path = "Sounds/"
-sprites_path = "Sprites/"
-
-compile(code_path)
-compile(graphics_path)
-compile(maps_path)
-compile(sounds_path)
-compile(sprites_path)
+compile("Code/")
 
 if not no_image:
-    print("Creating D64 image...")
+    print("Creating D64 images...")
 
-    subprocess.run([imager_path, "-format", "kalninja,id", "d64", "Build/kalninja.d64"])
+    for disk in disk_links:
+        print(disk + "...")
+        disk_path = "Build/" + disk + ".d64"
+        subprocess.run([imager_path, "-format", disk + ",id", "d64", disk_path])
 
-    output_index = 0
-    while (output_index < len(outputs)):
-        subprocess.run([imager_path, "-attach", "Build/kalninja.d64", "-write", outputs[output_index], output_names[output_index]])
-        output_index += 1
+        for file in disk_links[disk]:
+            target_file_name = file.rstrip(".prg")
+            subprocess.run([imager_path, "-attach", disk_path, "-write", file, file.split("/")[-1]])
+        
     
 print("Done.")
