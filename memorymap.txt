@@ -13,18 +13,19 @@ for the core's work buffers we need:
 which consumes 2KB and leaves us with 48KB left.
 
 for every level:
-2KB for level charset.
 2KB for quiet music data.
 2KB for dynamic music data.
 2KB for sound data.
-X amount of tiles, up to 256 3x3 tiles with 9 byte for char select, 5 byte for colour select, 1 byte for collision shape and 1 byte for collision response, totalling to up to 4,096 Bytes
+2KB for level charset.
+X amount of tiles, up to 256 3x3 tiles with 9 bytes for char select, 9 bytes for colour select, 1 byte for collision shape and 1 byte for collision response, totalling to up to 5,120 Bytes.
 X amount of screens, up to 60 (6x10 screens) 11x6 tiles (39x18 chars), with 1 byte to select, totalling up to 3,960 Bytes.
 X amount of sprites, up to 64 63 Byte register-sized sprites, with 1 byte for colours (2 nibbles), totalling up to 4,096 Bytes.
-The remaining 4,232 Bytes of data is free for programming.  Grows backwards.
-this consumes up to 24KB and leaves us with 24KB left.
+The remaining 5,256 Bytes of data is free for programming.  Grows backwards.
+this consumes up to 25KB and leaves us with 23KB left.
 it could take up to 82 seconds to load.
+note that the tiles' 1 byte for 
 
-this leaves us with 24KB left.  this remaining 24KB will be used by a small 8KB level always loaded in memory, the training void.
-Whilst the player waits for each level to load, as we will be no fastloader support, the player can do quick time learning events similar to sonic frontiers.
-the game also needs 4 disks, which is 5 levels per disk (120KB), but temple levels are cloned on each one meaning only 16 level slots are open (since the game has actually 15 levels, this makes the last disk only 96KB in size...maybe design a final level of some sort?).  a third disk should be used for save files.  the boot disk is also larger, since it contains the engine, the tutorial level, and the void, with 40KB, making that disk up to 160KB, just beneath the limit for a standard formatted disk.
+this leaves us with 23KB left.  this remaining 23KB will be used by a small 8KB level always loaded in memory, the training void.
+Whilst the player waits for each level to load, as we will be no fastloader support, the player can do quick time learning events in the training void similar to sonic frontiers.
+the game also needs 4 disks, which is 5 levels per disk (120KB), but temple levels are cloned on each one meaning only 16 level slots are open (since the game has actually 15 levels, this makes the last disk only 96KB in size...secretly though I'll put the debug map on it, so that will make it 120KB).  a third disk should be used for save files.  the boot disk is also larger, since it contains the engine, the tutorial level, and the void, with 40KB, making that disk up to 160KB, just beneath the limit for a standard formatted disk.
 
