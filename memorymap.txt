@@ -2,11 +2,11 @@ assuming we copy everything that's needed and leave hardware space untouched, we
 
 for the core, we need:
 2KB for UI charset.
-4KB for engine core.
+3,968 Bytes for engine core.
 2KB for player sprite data (32 frames cleverly split in half with 63 Bytes register-sized sprites and 1 byte for colours, using a split and flip engine).
-4KB for weapon sprite data (8 frames for 10 weapons plus 4 frames for 12 projectiles, 64 Bytes, using a rotation engine, shared between all characters). 
+4,224 Bytes for weapon sprite data (3 frames for 10 weapons plus 4 frames for 9 projectiles, 64 Bytes, using a rotation engine, shared between all characters). 
 this consumes 12KB and leaves us with 46KB left.
-it could take up to 42 seconds to load.
+it could take up to 36 seconds to load.
 
 for the core's work buffers we need:
 1KB for front buffer.
