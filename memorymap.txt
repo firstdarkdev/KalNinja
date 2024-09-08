@@ -26,7 +26,7 @@ this consumes up to 25KB and leaves us with 19KB left.
 it could take up to 82 seconds to load.
 note that the tiles' 2 bytes for collision need to be in a separate hex on the map file for the C64Studio map tool.
 
-this leaves us with 19KB left.  this remaining 19KB will be used by a small 8KB level always loaded in memory, the training void.
+this leaves us with 19KB left, but 13KB are used by the system, so the game only has 6KB left.  this remaining 6KB will be used by a small 4KB level always loaded in memory, the training void.
 Whilst the player waits for each level to load, as we will be no fastloader support, the player can do quick time learning events in the training void similar to sonic frontiers.
 the game also needs 4 disks, which is 5 levels per disk (120KB), but temple levels are cloned on each one meaning only 16 level slots are open (since the game has actually 15 levels, this makes the last disk only 96KB in size...secretly though I'll put the debug map on it, so that will make it 120KB).  a third disk should be used for save files.  the boot disk is also larger, since it contains the engine, the tutorial level, and the void, with 40KB, making that disk up to 160KB, just beneath the limit for a standard formatted disk.
 

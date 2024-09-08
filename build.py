@@ -72,8 +72,8 @@ if not no_image:
         subprocess.run([imager_path, "-format", disk + ",id", "d64", disk_path])
 
         for file in disk_links[disk]:
-            target_file_name = file.rstrip(".prg")
-            subprocess.run([imager_path, "-attach", disk_path, "-write", file, file.split("/")[-1]])
+            target_file_name = file.split(".")[0]
+            subprocess.run([imager_path, "-attach", disk_path, "-write", file, target_file_name.split("/")[-1]])
         
     
 print("Done.")

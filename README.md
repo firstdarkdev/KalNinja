@@ -37,6 +37,6 @@ For every disk that needs built, the repository's Code directory needs a new Dis
 Inside the solution, make a folder named after the disk.
 
 New code needs to go into the Code/{diskname} folder, then added to the solution manually.
-New resource files need created in editor, dragged into the proper folder, then added again into the solution.  This makes sure C64Studio has control over any headers it wants to have.
+New resource files need created in editor and placed into the correct folder via the wizard.  This makes sure C64Studio has control over any headers it wants to have.
 
 To link to the sources/media files in code, make sure to path correctly with "../" escapes, as many as it takes.
