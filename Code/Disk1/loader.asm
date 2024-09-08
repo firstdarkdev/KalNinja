@@ -44,6 +44,17 @@
 
   * = $0801
   
+  ;sys call
+  !word BASIC_END
+  !word 0
+  !byte $9E ;sys
+  !text "2061"
+  !byte 0
+  BASIC_END:
+  !word 0
+  
+  * = $080D
+  
   ;disable basic
   lda #36
   sta $01
