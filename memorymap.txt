@@ -3,14 +3,15 @@ assuming we copy everything that's needed and leave hardware space untouched, we
 for the core, we need:
 2KB for UI charset.
 4KB for engine core.
-2KB for player sprite data (32 frames cleverly split in half with 63 Bytes register-sized sprites and 1 byte for colours).
-this consumes 8KB and leaves us with 50KB left.
-it could take up to 28 seconds to load.
+2KB for player sprite data (32 frames cleverly split in half with 63 Bytes register-sized sprites and 1 byte for colours, using a split and flip engine).
+4KB for weapon sprite data (8 frames for 10 weapons plus 4 frames for 12 projectiles, 64 Bytes, using a rotation engine, shared between all characters). 
+this consumes 12KB and leaves us with 46KB left.
+it could take up to 42 seconds to load.
 
 for the core's work buffers we need:
 1KB for front buffer.
 1KB for back buffer.
-which consumes 2KB and leaves us with 48KB left.
+which consumes 2KB and leaves us with 44KB left.
 
 for every level:
 2KB for quiet music data.
@@ -21,11 +22,11 @@ X amount of tiles, up to 256 3x3 tiles with 9 bytes for char select, 9 bytes for
 X amount of screens, up to 60 (6x10 screens) 11x6 tiles (39x18 chars), with 1 byte to select, totalling up to 3,960 Bytes.
 X amount of sprites, up to 64 63 Byte register-sized sprites, with 1 byte for colours (2 nibbles), totalling up to 4,096 Bytes.
 The remaining 5,256 Bytes of data is free for programming.  Grows backwards.
-this consumes up to 25KB and leaves us with 23KB left.
+this consumes up to 25KB and leaves us with 19KB left.
 it could take up to 82 seconds to load.
-note that the tiles' 1 byte for 
+note that the tiles' 2 bytes for collision need to be in a separate hex on the map file for the C64Studio map tool.
 
-this leaves us with 23KB left.  this remaining 23KB will be used by a small 8KB level always loaded in memory, the training void.
+this leaves us with 19KB left.  this remaining 19KB will be used by a small 8KB level always loaded in memory, the training void.
 Whilst the player waits for each level to load, as we will be no fastloader support, the player can do quick time learning events in the training void similar to sonic frontiers.
 the game also needs 4 disks, which is 5 levels per disk (120KB), but temple levels are cloned on each one meaning only 16 level slots are open (since the game has actually 15 levels, this makes the last disk only 96KB in size...secretly though I'll put the debug map on it, so that will make it 120KB).  a third disk should be used for save files.  the boot disk is also larger, since it contains the engine, the tutorial level, and the void, with 40KB, making that disk up to 160KB, just beneath the limit for a standard formatted disk.
 
