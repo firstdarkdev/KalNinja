@@ -56,9 +56,10 @@
   jsr KERNAL.SETLFS
   
   ;TODO: ldx and ldy to position on a code table of CORE.
+  ;for now, the $2000 address is hard coded.
   lda #0
   ldx #$00
-  ldy #$18
+  ldy #$20
   jsr KERNAL.LOAD
   
   ;once done, jump to the first instruction in the core, exiting this loader.
@@ -77,9 +78,8 @@
     
     ;increment colour and reset timer.
     jsr NEXT_COLOR
-  
-  CHAIN: 
-    jmp $0000
+    
+  CHAIN: jmp $0000
     
   NEXT_COLOR:
     ;reset frame counter
