@@ -40,6 +40,22 @@ if ((imager_path == "") & (no_image != True)):
     imager_path = tkinter.filedialog.askopenfilename()
     print(imager_path)
 
+print("Compiling libraries...")
+
+def compile_labels(path):
+    for (dir_path, dir_names, file_names) in os.walk(path):
+        for file in file_names:
+            if (file.endswith(".lib.asm")):
+                source = dir_path + file
+                artifact_name = source.rstrip(".lib.asm") + ".prg"
+                target_file_name = source.rstrip(".lib.asm") + ".asm"
+                artifact_to_delete = os.getcwd() + "\\" + artifact_name
+
+                subprocess.run([compiler_path, source, "-l", target_file_name, "-o", artifact_name])
+                os.remove(artifact_to_delete)
+
+compile_labels("Library\\")
+
 print("Compiling code...")
 
 def compile(path):

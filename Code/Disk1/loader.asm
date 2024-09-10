@@ -1,6 +1,7 @@
 !cpu 6510
 
 !source "../../Library/c64.asm",once
+!source "../../Library/engine.asm",once
 
 !zone LOADER
 
@@ -55,15 +56,13 @@
   ldy #0
   jsr KERNAL.SETLFS
   
-  ;TODO: ldx and ldy to position on a code table of CORE.
-  ;for now, the $2000 address is hard coded.
   lda #0
-  ldx #$00
-  ldy #$20
+  ldx #<ENGINE.CORE_PRG
+  ldy #>ENGINE.CORE_PRG
   jsr KERNAL.LOAD
   
   ;once done, jump to the first instruction in the core, exiting this loader.
-  jmp $2000
+  jmp ENGINE.START
   
   BORDER_COLOR_IRQ:
     ;respond to vic
