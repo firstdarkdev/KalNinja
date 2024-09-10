@@ -29,14 +29,17 @@ This file does not update if -NoImage was specified.
 
 ## Development Practices
 
-Development of code in terms of actual repository structure will be inherently different to the solution file, as C64Studio cannot directly browse the folder it is working with.
+Development of code in terms of actual repository structure will be inherently different to the solution file, as C64Studio does not provide a clean way to build everything together.
 This means I have laid out a standard.
 
 For every disk that needs built, the repository's Code directory needs a new Disk folder, and the Build/PRGs directory needs a folder of the __same exact name__.
 
-Inside the solution, make a folder named after the disk.
+Inside the solution, make a folder named after the disk, to organise the project.
 
-New code needs to go into the Code/{diskname} folder, then added to the solution manually.
-New resource files need created in editor and placed into the correct folder via the wizard.  This makes sure C64Studio has control over any headers it wants to have.
+New resource and code files need created in editor and placed into the correct folder via the wizard.  This makes sure C64Studio has control over any headers it wants to have.
 
 To link to the sources/media files in code, make sure to path correctly with "../" escapes, as many as it takes.
+
+Libraries (shared code) need to go in the Library folder, with the extension .lib.asm, instead of just .asm.
+This allows build.py to spit out a label-only "header" .asm file in the same directory, which can be used by other code without injecting the library's binary more than once (similar to c64.asm's use case)
+This is due to an oversight from the !source command in C64Studio.  But this is a rather clean workaround.
