@@ -6,6 +6,12 @@ import tkinter
 from os import walk
 from tkinter import filedialog
 
+print("Cleaning all PRGs")
+for (dir_path, dir_names, file_names) in os.walk(os.getcwd()):
+    for file in file_names:
+        if (file.endswith(".prg")):
+            os.remove(dir_path + "\\" + file)
+
 no_image = False
 disk_links = dict()
 compiler_path = "Compiler/C64Ass.exe"
@@ -25,7 +31,7 @@ while argument_index < arguments_length:
         argument_index += 1
 
     elif (sys.argv[argument_index] == "-NoImage"):
-        print ("Requested only PRG files, assuming no Imager available.")
+        print ("Requested only PRG files, assuming VICE - c1541.exe is not available.")
         no_image = True
 
     argument_index += 1
