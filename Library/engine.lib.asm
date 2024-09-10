@@ -104,7 +104,7 @@
     lda #.MENU_TYPE.LIST
     ldx #<.MAIN_MENU
     ldy #>.MAIN_MENU
-    jsr .MENU.NEW_MENU
+    jsr MENU.NEW_MENU
     
     
   ;occurs in the background whilst VIC is doing literally anything.
@@ -217,17 +217,17 @@
   ;PRIVATE RESOURCES
   .MAIN_MENU:
     ;title
-    !byte .MENU.TITLE
+    !byte MENU.TITLE
     !byte <.MAIN_MENU.TITLE, >.MAIN_MENU.TITLE
     !byte 0
     ;load
-    !byte .MENU.CHOICE
+    !byte MENU.CHOICE
     !text "LOAD GAME"
     !byte 0
     !byte <.MAIN_MENU.ON_LOAD, >.MAIN_MENU.ON_LOAD
     !byte 0
     ;save
-    !byte .MENU.CHOICE
+    !byte MENU.CHOICE
     !text "NEW GAME"
     !byte 0
     !byte <.MAIN_MENU.ON_NEW, >.MAIN_MENU.ON_NEW
@@ -236,40 +236,39 @@
     
     .MAIN_MENU.TITLE:
       !media "menutitles.charscreen",charcolor,0,0,10,5
-    
-    
-  ;PUBLIC SUBROUTINES
-  !zone .MENU
-    
-    .TITLE = 1
-    .CHOICE = 2
-    
-    .NEW_MENU:
-      ;store parameters
-      sta ENGINE.MENU_TYPE
-      stx ENGINE.MENU_OPTIONS
-      sty ENGINE.MENU_OPTIONS_END
-      
-      ;change engine modes
-      lda #ENGINE.GAME_MODE.MENU
-      sta ENGINE.GAME_MODE
-      
-      ;reset menu selection
-      lda #0
-      sta ENGINE.MENU_SELECTION
-      
-      rts
   
-  !zone
+!zone
+
+;PUBLIC SUBROUTINES
+!zone MENU
   
-  !zone .SCRIPT
+  .TITLE = 1
+  .CHOICE = 2
+  
+  .NEW_MENU:
+    ;store parameters
+    sta ENGINE.MENU_TYPE
+    stx ENGINE.MENU_OPTIONS
+    sty ENGINE.MENU_OPTIONS_END
     
-    ;self modify the loop caller
-    .REGISTER_LOOP:
-      sta ENGINE.GAME_LOOP.SCRIPT_EXIT + 1
-      stx ENGINE.GAME_LOOP.SCRIPT_EXIT + 2
-      rts
+    ;change engine modes
+    lda #ENGINE.GAME_MODE.MENU
+    sta ENGINE.GAME_MODE
+    
+    ;reset menu selection
+    lda #0
+    sta ENGINE.MENU_SELECTION
+    
+    rts
+
+!zone
+
+!zone SCRIPT
   
-  !zone
-  
+  ;self modify the loop caller
+  .REGISTER_LOOP:
+    sta ENGINE.GAME_LOOP.SCRIPT_EXIT + 1
+    stx ENGINE.GAME_LOOP.SCRIPT_EXIT + 2
+    rts
+
 !zone
