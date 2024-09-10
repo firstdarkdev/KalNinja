@@ -22,9 +22,29 @@
   .LEVEL_VARIABLES = $BC00
   .SCRATCHPAD_MEMORY = $C000
 
-  * = $2000
+  * = .CORE_PRG
 
   .START:
+    ;override the loader's IRQ.
+    ;we can't link the addresses in compilation in a specified order, so we just use the global variables in the zero page instead.
+    ;we are also gonna reuse these variables later, so just extract directly.
+    lda $04
+    sta .IRQ_CHAIN + 1
+    lda $05
+    sta .IRQ_CHAIN + 2
+    
+    lda #<.IRQ
+    sta $0314
+    lda #>.IRQ
+    sta $0315
+    
     jam
+    
+  .IRQ:
+    jam
+  
+  
+  .IRQ_CHAIN: 
+    jmp $0000 ;self modified, usually ends up going back to KERNAL.
   
 !zone

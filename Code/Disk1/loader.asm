@@ -7,16 +7,18 @@
 
   .BORDER_FRAME_TIMER = $02
   .BORDER_COLOR = $03
+  .OLD_IRQ_LO = $04
+  .OLD_IRQ_HI = $05
 
   * = $0801
   
   ;sys call
-  !word BASIC_END
+  !word .BASIC_END
   !word 0
   !byte $9E ;sys
   !text "2061"
   !byte 0
-  BASIC_END:
+  .BASIC_END:
   !word 0
   
   * = $080D
@@ -27,14 +29,16 @@
   
   ;link chain to irq using self modifying code
   lda $0314
-  sta CHAIN + 1
+  sta .IRQ_CHAIN + 1
+  sta .OLD_IRQ_LO
   lda $0315
-  sta CHAIN + 2
+  sta .IRQ_CHAIN + 2
+  sta .OLD_IRQ_HI
   
   ;then inject own routine
-  lda #<BORDER_COLOR_IRQ
+  lda #<.BORDER_COLOR_IRQ
   sta $0314
-  lda #>BORDER_COLOR_IRQ
+  lda #>.BORDER_COLOR_IRQ
   sta $0315
   
   ;setup raster line irq
@@ -46,9 +50,9 @@
   sta VIC.RASTER_POS
   
   ;and start loading CORE,PRG
-  lda #CORE_FILE_NAME_END - CORE_FILE_NAME
-  ldx #<CORE_FILE_NAME
-  ldy #>CORE_FILE_NAME
+  lda #.CORE_FILE_NAME_END - .CORE_FILE_NAME
+  ldx #<.CORE_FILE_NAME
+  ldy #>.CORE_FILE_NAME
   jsr KERNAL.SETNAM
   
   lda #15
@@ -64,7 +68,7 @@
   ;once done, jump to the first instruction in the core, exiting this loader.
   jmp ENGINE.START
   
-  BORDER_COLOR_IRQ:
+  .BORDER_COLOR_IRQ:
     ;respond to vic
     lda #%00000000
     sta VIC.IRQ_MASK
@@ -73,14 +77,14 @@
     inc .BORDER_FRAME_TIMER
     lda #150 ;about 3 seconds
     cmp .BORDER_FRAME_TIMER
-    bne CHAIN ;don't do anything if not enough frames elapsed.
+    bne .IRQ_CHAIN ;don't do anything if not enough frames elapsed.
     
     ;increment colour and reset timer.
-    jsr NEXT_COLOR
+    jsr .NEXT_COLOR
     
-  CHAIN: jmp $0000
+  .IRQ_CHAIN: jmp $0000
     
-  NEXT_COLOR:
+  .NEXT_COLOR:
     ;reset frame counter
     lda #0
     sta $02
@@ -92,8 +96,8 @@
     
     rts
   
-  CORE_FILE_NAME:  
+  .CORE_FILE_NAME:  
     !text "CORE,PRG"
-  CORE_FILE_NAME_END:
+  .CORE_FILE_NAME_END:
   
 !zone
