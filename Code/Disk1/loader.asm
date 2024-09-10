@@ -1,6 +1,5 @@
 !cpu 6510
 
-!source "../../Library/c64.asm",once
 !source "../../Library/engine.asm",once
 
 !zone LOADER
