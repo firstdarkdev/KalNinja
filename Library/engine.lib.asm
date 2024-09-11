@@ -7,17 +7,11 @@
   ;variables
   .IRQ_WAIT_FLAGS = $02
   .GAME_MODE = $03
-  .MENU_OPTIONS = $04
-  .MENU_OPTIONS_END = $05
-  .MENU_TYPE = $06
-  .MENU_SELECTION = $07
-  .SCRIPT_LOOP_LO = $08
-  .SCRIPT_LOOP_HI = $09
   ;0A used by KERNAL LOAD/VERIFY switch
-  .KEY_IN = $0B
-  .JOY_IN = $0C
-  .BUFFER_SWITCH = $0D
-  .CHAR_SWITCH = $0E
+  .KEY_IN = $08
+  .JOY_IN = $09
+  .BUFFER_SWITCH = $0B
+  .CHAR_SWITCH = $0C
   
   ;irq wait flags
   .IRQ_WAIT_FLAGS.CLEARED = %00000000
@@ -27,11 +21,6 @@
   ;game modes
   .GAME_MODE.MENU = $00
   .GAME_MODE.GAMEPLAY = $01
-  
-  ;menu types
-  .MENU_TYPE.LIST = $00
-  .MENU_TYPE.GRID = $01
-  .MENU_TYPE.DIALOGUE = $02
   
   ;VIC Buffer modes
   .VIC_BUFFER_1 = %00010000
@@ -95,16 +84,16 @@
     sta VIC.CONTROL_1
     lda #%00010000 ;38 columns, multicolor mode.
     
+    ;setup variables
     lda #.VIC_BUFFER_1
     sta .BUFFER_SWITCH
     lda #.VIC_UI_CHAR
     sta .CHAR_SWITCH
+    lda #.GAME_MODE.MENU
+    sta .GAME_MODE
     
-    ;setup main menu
-    lda #.MENU_TYPE.LIST
-    ldx #<.MAIN_MENU
-    ldy #>.MAIN_MENU
-    jsr MENU.NEW_MENU
+    ;setup core.
+    jsr SCRIPT.MENU_START
     
     
   ;occurs in the background whilst VIC is doing literally anything.
@@ -121,22 +110,25 @@
     sta .JOY_IN
   
     ;judge what to do with input responses based on the game mode.
+    ;based on this, only two game modes are possible.
+    ;TODO: consider better check
     lda .GAME_MODE
-    cmp .GAME_MODE.MENU
-    beq .GAME_LOOP.MENU
     cmp .GAME_MODE.GAMEPLAY
     beq .GAME_LOOP.GAMEPLAY
     
     .GAME_LOOP.MENU:
       
     
-      jmp .WAIT_TO_DRAW
+      .GAME_LOOP.RUN_MENU_SCRIPT:
+        jsr $0000
+        
+        jmp .WAIT_TO_DRAW
       
     .GAME_LOOP.GAMEPLAY:
       
     
-      .GAME_LOOP.SCRIPT_EXIT:
-      jsr $0000
+      .GAME_LOOP.RUN_GAMEPLAY_SCRIPT:
+        jsr $0000
       
       
   ;wait until the raster beam has just entered lower overdraw to enter the render loop.
@@ -156,14 +148,17 @@
     ora .CHAR_SWITCH
     sta VIC.MEMORY_CONTROL
     
-    ;TODO: flip colour buffer.
-    
-    ;switch buffers, so that next game loop, puts data into the back buffer.
+    ;switch buffers, so that next game loop puts data into the back buffer.
     lda .BUFFER_SWITCH
     clc
-    adc #%10000000
-    bcc .BUFFER_DONE
+    adc #%10000000 ;switch to address $6000
+    bcc .COLOR_SWITCH
+    lda .VIC_BUFFER_1
     sta .BUFFER_SWITCH
+    
+    ;TODO: flip colour buffer.
+    .COLOR_SWITCH:
+    
     
     .BUFFER_DONE:
       lda #.IRQ_WAIT_FLAGS.CLEARED
@@ -207,49 +202,29 @@
     
     .IRQ.CHAIN: 
       jmp $0000 ;self modified, usually ends up going back to KERNAL.
-  
-  ;PRIVATE EVENTS
-  .MAIN_MENU.ON_LOAD:
-    rts
-  .MAIN_MENU.ON_NEW:
-    rts
-    
-  ;PRIVATE RESOURCES
-  .MAIN_MENU:
-    ;title
-    !byte MENU.TITLE
-    !byte <.MAIN_MENU.TITLE, >.MAIN_MENU.TITLE
-    !byte 0
-    ;load
-    !byte MENU.CHOICE
-    !text "LOAD GAME"
-    !byte 0
-    !byte <.MAIN_MENU.ON_LOAD, >.MAIN_MENU.ON_LOAD
-    !byte 0
-    ;save
-    !byte MENU.CHOICE
-    !text "NEW GAME"
-    !byte 0
-    !byte <.MAIN_MENU.ON_NEW, >.MAIN_MENU.ON_NEW
-    !byte 0
-    !byte 0
-    
-    .MAIN_MENU.TITLE:
-      !media "menutitles.charscreen",charcolor,0,0,10,5
-  
-!zone
 
 ;PUBLIC SUBROUTINES
 !zone MENU
+  
+  ;variables
+  .OPTIONS = $04
+  .OPTIONS_END = $05
+  .TYPE = $06
+  .SELECTION = $07
+  
+  ;menu types
+  .TYPE.LIST = $00
+  .TYPE.GRID = $01
+  .TYPE.DIALOGUE = $02
   
   .TITLE = 1
   .CHOICE = 2
   
   .NEW_MENU:
     ;store parameters
-    sta ENGINE.MENU_TYPE
-    stx ENGINE.MENU_OPTIONS
-    sty ENGINE.MENU_OPTIONS_END
+    sta .TYPE
+    stx .OPTIONS
+    sty .OPTIONS_END
     
     ;change engine modes
     lda #ENGINE.GAME_MODE.MENU
@@ -257,18 +232,25 @@
     
     ;reset menu selection
     lda #0
-    sta ENGINE.MENU_SELECTION
+    sta .SELECTION
     
     rts
-
-!zone
 
 !zone SCRIPT
   
   ;self modify the loop caller
-  .REGISTER_LOOP:
-    sta ENGINE.GAME_LOOP.SCRIPT_EXIT + 1
-    stx ENGINE.GAME_LOOP.SCRIPT_EXIT + 2
+  .REGISTER_GAMEPLAY_LOOP:
+    sta ENGINE.GAME_LOOP.RUN_GAMEPLAY_SCRIPT + 1
+    stx ENGINE.GAME_LOOP.RUN_GAMEPLAY_SCRIPT + 2
+    rts
+    
+  .REGISTER_MENU_LOOP:
+    sta ENGINE.GAME_LOOP.RUN_MENU_SCRIPT + 1
+    stx ENGINE.GAME_LOOP.RUN_MENU_SCRIPT + 2
     rts
 
+  .MENU_START:
+  ;point to here with your core code so the engine can kickstart.
+  
 !zone
+

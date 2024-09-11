@@ -74,9 +74,9 @@
   
     ;count frames
     inc .BORDER_FRAME_TIMER
-    lda #150 ;about 3 seconds
+    lda #50 ;about 3 seconds
     cmp .BORDER_FRAME_TIMER
-    bne .IRQ_CHAIN ;don't do anything if not enough frames elapsed.
+    bcs .IRQ_CHAIN ;don't do anything if not enough frames elapsed.
     
     ;increment colour and reset timer.
     jsr .NEXT_COLOR
