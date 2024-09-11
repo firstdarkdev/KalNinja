@@ -7,11 +7,10 @@
   ;variables
   .IRQ_WAIT_FLAGS = $02
   .GAME_MODE = $03
-  ;0A used by KERNAL LOAD/VERIFY switch
-  .KEY_IN = $08
-  .JOY_IN = $09
-  .BUFFER_SWITCH = $0B
-  .CHAR_SWITCH = $0C
+  .KEY_IN = $04
+  .JOY_IN = $05
+  .BUFFER_SWITCH = $06
+  .CHAR_SWITCH = $07
   
   ;irq wait flags
   .IRQ_WAIT_FLAGS.CLEARED = %00000000
@@ -23,7 +22,7 @@
   .GAME_MODE.GAMEPLAY = $01
   
   ;VIC Buffer modes
-  .VIC_BUFFER_1 = %00010000
+  .VIC_BUFFER_1 = %10000000
   .VIC_BUFFER_2 = %10010000
   .VIC_UI_CHAR = %00000001
   .VIC_GAME_CHAR = %00001011
@@ -72,6 +71,9 @@
     sta $028A ;disable key repeat
     
     ;setup VIC
+    lda CIA2.DATA_DIRECTION_REGISTER_A
+    ora #%00000011 ;set port to output so the VIC switches banks
+    sta CIA2.DATA_DIRECTION_REGISTER_A
     lda CIA2.DATA_PORT_A
     and #%11111100
     ora #%00000010 ;set to Bank 1 ($4000 - $7FFF)
@@ -80,9 +82,10 @@
     lda #0
     sta VIC.BORDER_COLOR
     sta VIC.BACKGROUND_COLOR
-    lda #%00010000 ;24 rows, char mode.
+    lda #%00010000 ;24 rows, char mode, vertical scroll middle
     sta VIC.CONTROL_1
-    lda #%00010000 ;38 columns, multicolor mode.
+    lda #%11010000 ;38 columns, multicolor mode.
+    sta VIC.CONTROL_2
     
     ;setup variables
     lda #.VIC_BUFFER_1
@@ -91,6 +94,8 @@
     sta .CHAR_SWITCH
     lda #.GAME_MODE.MENU
     sta .GAME_MODE
+    
+    jsr .SWAP_BUFFERS
     
     ;setup core.
     jsr SCRIPT.MENU_START
@@ -143,18 +148,7 @@
     cmp #.IRQ_WAIT_FLAGS.OVERDRAW_REACHED
     bne .RENDER_LOOP
     
-    ;combine the buffer switch and char switch into one vic memory map.
-    lda .BUFFER_SWITCH
-    ora .CHAR_SWITCH
-    sta VIC.MEMORY_CONTROL
-    
-    ;switch buffers, so that next game loop puts data into the back buffer.
-    lda .BUFFER_SWITCH
-    clc
-    adc #%10000000 ;switch to address $6000
-    bcc .COLOR_SWITCH
-    lda .VIC_BUFFER_1
-    sta .BUFFER_SWITCH
+    jsr .SWAP_BUFFERS
     
     ;TODO: flip colour buffer.
     .COLOR_SWITCH:
@@ -195,22 +189,39 @@
       cmp .IRQ_WAIT_FLAGS.PENDING_OVERDRAW
       bne .IRQ.CHAIN
       
-      
+      lda #%00000000
+      sta VIC.IRQ_MASK
       
       lda .IRQ_WAIT_FLAGS.OVERDRAW_REACHED
       sta .IRQ_WAIT_FLAGS
     
     .IRQ.CHAIN: 
       jmp $0000 ;self modified, usually ends up going back to KERNAL.
+      
+  ;PRIVATE SUBROUTINES
+  .SWAP_BUFFERS:
+    ;combine the buffer switch and char switch into one vic memory map.
+    lda .BUFFER_SWITCH
+    ora .CHAR_SWITCH
+    sta VIC.MEMORY_CONTROL
+    
+    ;switch buffers, so that next game loop puts data into the back buffer.
+    lda .BUFFER_SWITCH
+    eor #%00010000 ;switch to address $6800, or back.
+    sta .BUFFER_SWITCH
+    
+    .SWAP_BUFFERS.EXIT:
+      rts
 
 ;PUBLIC SUBROUTINES
 !zone MENU
   
   ;variables
-  .OPTIONS = $04
-  .OPTIONS_END = $05
-  .TYPE = $06
-  .SELECTION = $07
+  .OPTIONS = $08
+  .OPTIONS_END = $09
+  ;0A used by KERNAL LOAD/VERIFY switch
+  .TYPE = $0B
+  .SELECTION = $0C
   
   ;menu types
   .TYPE.LIST = $00

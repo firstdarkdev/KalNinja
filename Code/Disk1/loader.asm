@@ -74,8 +74,9 @@
   
     ;count frames
     inc .BORDER_FRAME_TIMER
-    lda #50 ;about 3 seconds
+    lda #150 ;about 3 seconds
     cmp .BORDER_FRAME_TIMER
+    ;we can't use beq here because the fetch may contain 0 already, which sets the zero flag.
     bcs .IRQ_CHAIN ;don't do anything if not enough frames elapsed.
     
     ;increment colour and reset timer.
