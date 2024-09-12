@@ -18,8 +18,8 @@
   .IRQ_WAIT_FLAGS.OVERDRAW_REACHED = %10000001
   
   ;game modes
-  .GAME_MODE.MENU = $00
-  .GAME_MODE.GAMEPLAY = $01
+  .GAME_MODE.MENU = 1
+  .GAME_MODE.GAMEPLAY = 2
   
   ;VIC Buffer modes
   .VIC_BUFFER_1 = %10000000
@@ -114,31 +114,31 @@
     lda CIA1.DATA_PORT_B
     sta .JOY_IN
   
-    ;judge what to do with input responses based on the game mode.
-    ;based on this, only two game modes are possible.
-    ;TODO: consider better check
+    ;only do the level's script and tilemap scrolling if we're in gameplay mode
     lda .GAME_MODE
-    cmp .GAME_MODE.GAMEPLAY
-    beq .GAME_LOOP.GAMEPLAY
+    cmp #.GAME_MODE.MENU
+    beq .GAME_LOOP.MENU_LOOP
     
-    .GAME_LOOP.MENU:
-      
+    ;TODO back buffer rendering stuff for the map's scrolling
     
-      .GAME_LOOP.RUN_MENU_SCRIPT:
-        jsr $0000
-        
-        jmp .WAIT_TO_DRAW
+    .GAME_LOOP.RUN_LEVEL_SCRIPT:
+      jsr $0000
       
-    .GAME_LOOP.GAMEPLAY:
+    ;TODO render the current menu as a HUD.
       
-    
-      .GAME_LOOP.RUN_GAMEPLAY_SCRIPT:
-        jsr $0000
+    ;now run the main script.
+    jmp .GAME_LOOP.RUN_MAIN_SCRIPT
       
+    ;rendering the screen as a menu instead of gameplay was requested...
+    .GAME_LOOP.MENU_LOOP:
       
-  ;wait until the raster beam has just entered lower overdraw to enter the render loop.
-  .WAIT_TO_DRAW:
-    
+      ;TODO render the menu as the whole screen.
+
+    ;now run the main script no matter which screen mode.
+    .GAME_LOOP.RUN_MAIN_SCRIPT:
+      jsr $0000
+      
+    ;and now we wait for overdraw
     lda #.IRQ_WAIT_FLAGS.PENDING_OVERDRAW
     sta .IRQ_WAIT_FLAGS
     
@@ -163,19 +163,17 @@
   ;PRIVATE INTERRUPT
   .IRQ:
     lda .GAME_MODE
-    cmp .GAME_MODE.MENU
-    beq .MENU
-    cmp .GAME_MODE.GAMEPLAY
-    beq .GAMEPLAY
+    cmp #.GAME_MODE.GAMEPLAY
+    beq .IRQ.GAMEPLAY
     
-    .MENU:
+    .IRQ.MENU:
       ;TODO: no sprite multiplexing
       
       ;Sound
     
       jmp .IRQ.EXIT
     
-    .GAMEPLAY:
+    .IRQ.GAMEPLAY:
       ;TODO: sprite multiplexing
       
       ;TODO: screen splitting
@@ -224,22 +222,22 @@
   .SELECTION = $0C
   
   ;menu types
-  .TYPE.LIST = $00
-  .TYPE.GRID = $01
-  .TYPE.DIALOGUE = $02
+  .TYPE.LIST = 0
+  .TYPE.GRID = 1
   
-  .TITLE = 1
-  .CHOICE = 2
+  .ELEMENT.END = 1
+  .ELEMENT.TEXT = 2
+  .ELEMENT.ICON = 3
+  .ELEMENT.CHOICE = 4
+  .ELEMENT.CHOICE.ON_SELECT = 5
+  .ELEMENT.CHOICE.ON_CHOSEN = 6
+  .ELEMENT.CHOICE.ON_NOT_CHOSEN = 7
   
   .NEW_MENU:
     ;store parameters
     sta .TYPE
     stx .OPTIONS
     sty .OPTIONS_END
-    
-    ;change engine modes
-    lda #ENGINE.GAME_MODE.MENU
-    sta ENGINE.GAME_MODE
     
     ;reset menu selection
     lda #0
@@ -250,14 +248,14 @@
 !zone SCRIPT
   
   ;self modify the loop caller
-  .REGISTER_GAMEPLAY_LOOP:
-    sta ENGINE.GAME_LOOP.RUN_GAMEPLAY_SCRIPT + 1
-    stx ENGINE.GAME_LOOP.RUN_GAMEPLAY_SCRIPT + 2
+  .REGISTER_LEVEL_LOOP:
+    sta ENGINE.GAME_LOOP.RUN_LEVEL_SCRIPT + 1
+    stx ENGINE.GAME_LOOP.RUN_LEVEL_SCRIPT + 2
     rts
     
-  .REGISTER_MENU_LOOP:
-    sta ENGINE.GAME_LOOP.RUN_MENU_SCRIPT + 1
-    stx ENGINE.GAME_LOOP.RUN_MENU_SCRIPT + 2
+  .REGISTER_MAIN_LOOP:
+    sta ENGINE.GAME_LOOP.RUN_MAIN_SCRIPT + 1
+    stx ENGINE.GAME_LOOP.RUN_MAIN_SCRIPT + 2
     rts
 
   .MENU_START:

@@ -9,17 +9,21 @@
 
   ;SCRIPTS
   * = SCRIPT.MENU_START
-
-  ;setup main menu
+    
+  ;setup menu loop script
+    lda #<.LOOP
+    ldx #>.LOOP
+    jsr SCRIPT.REGISTER_MAIN_LOOP
+    
+    ;setup main menu
     lda #MENU.TYPE.LIST
     ldx #<.MAIN_MENU
     ldy #>.MAIN_MENU
     jsr MENU.NEW_MENU
     
-  ;setup menu loop script
-    lda #<.LOOP
-    ldx #>.LOOP
-    jsr SCRIPT.REGISTER_MENU_LOOP
+    ;set engine to render it and not gameplay.
+    lda #ENGINE.GAME_MODE.MENU
+    sta ENGINE.GAME_MODE
     
   ;return to engine
     rts
@@ -31,34 +35,11 @@
     ;return to engine
     rts
 
-  ;MENU EVENTS
-  .MAIN_MENU.ON_LOAD:
-    rts
-  .MAIN_MENU.ON_NEW:
-    rts
+  ;EVENTS
     
-  ;PRIVATE RESOURCES
+  ;RESOURCES
   .MAIN_MENU:
-    ;title
-    !byte MENU.TITLE
-    !byte <.MAIN_MENU.TITLE, >.MAIN_MENU.TITLE
-    !byte 0
-    ;load
-    !byte MENU.CHOICE
-    !text "LOAD GAME"
-    !byte 0
-    !byte <.MAIN_MENU.ON_LOAD, >.MAIN_MENU.ON_LOAD
-    !byte 0
-    ;save
-    !byte MENU.CHOICE
-    !text "NEW GAME"
-    !byte 0
-    !byte <.MAIN_MENU.ON_NEW, >.MAIN_MENU.ON_NEW
-    !byte 0
-    !byte 0
     
-    .MAIN_MENU.TITLE:
-      !media "../../Library/menutitles.charscreen",charcolor,0,0,10,5
 
   * = ENGINE.UI_CHAR
 
