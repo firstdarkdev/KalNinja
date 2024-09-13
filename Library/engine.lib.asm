@@ -162,34 +162,45 @@
     
   ;PRIVATE INTERRUPT
   .IRQ:
+    ;respond to the VIC immediately.  this engine uses the VIC to time absolutely everything.
+    lda #%00000000
+    sta VIC.IRQ_MASK
+    
+    ;TODO: increase registered timers here.
+  
     lda .GAME_MODE
     cmp #.GAME_MODE.GAMEPLAY
     beq .IRQ.GAMEPLAY
     
     .IRQ.MENU:
-      ;TODO: no sprite multiplexing
+      ;TODO: no sprite multiplexing, just pull the bottom 8.
       
-      ;Sound
+      ;TODO: sound during the border/blank
+      
+      ;we want to interrupt next time at the screen bottom.
+      
     
       jmp .IRQ.EXIT
     
     .IRQ.GAMEPLAY:
-      ;TODO: sprite multiplexing
+      ;TODO: sprite multiplexing, this means the interrupt position will change every time.
       
       ;TODO: screen splitting
       
-      ;Sound
+      ;TODO: sound during the border/blank
+      
+      ;and now we want to interrupt when the screen hits the bottom.
     
       jmp .IRQ.EXIT
 
     .IRQ.EXIT:
+      ;don't respond to the engine if it isn't waiting.
+      ;this allows sprite multiplexing, timers and sound to tick even whilst the game is processing.
       lda .IRQ_WAIT_FLAGS
       cmp .IRQ_WAIT_FLAGS.PENDING_OVERDRAW
       bne .IRQ.CHAIN
       
-      lda #%00000000
-      sta VIC.IRQ_MASK
-      
+      ;the engine should stop waiting.  this means the buffers shall be flipped.
       lda .IRQ_WAIT_FLAGS.OVERDRAW_REACHED
       sta .IRQ_WAIT_FLAGS
     
@@ -222,8 +233,8 @@
   .SELECTION = $0C
   
   ;menu types
-  .TYPE.LIST = 0
-  .TYPE.GRID = 1
+  .TYPE.LIST = 1
+  .TYPE.GRID = 2
   
   .ELEMENT.END = 1
   .ELEMENT.TEXT = 2
@@ -232,6 +243,10 @@
   .ELEMENT.CHOICE.ON_SELECT = 5
   .ELEMENT.CHOICE.ON_CHOSEN = 6
   .ELEMENT.CHOICE.ON_NOT_CHOSEN = 7
+  .ELEMENT.COLOR = 8
+  .ELEMENT.BACK_COLOR_1 = 9
+  .ELEMENT.BACK_COLOR_2 = 10
+  .ELEMENT.BACK_COLOR_3 = 11
   
   .NEW_MENU:
     ;store parameters

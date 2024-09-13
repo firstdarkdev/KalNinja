@@ -7,10 +7,19 @@
 
 !zone CORE
 
+  .GAME_STATE = $0D
+  
+  .GAME_STATE.MAIN_MENU = 1
+  .GAME_STATE.SAVE_MENU = 2
+  .GAME_STATE.LOAD_MENU = 3
+  .GAME_STATE.PAUSE_MENU = 4
+  .GAME_STATE.TRAINING_VOID = 5
+  .GAME_STATE.GAMEPLAY = 6
+
   ;SCRIPTS
   * = SCRIPT.MENU_START
     
-  ;setup menu loop script
+    ;setup menu loop script
     lda #<.LOOP
     ldx #>.LOOP
     jsr SCRIPT.REGISTER_MAIN_LOOP
