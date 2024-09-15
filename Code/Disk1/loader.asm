@@ -22,6 +22,8 @@
   
   * = $080D
   
+  sei
+  
   ;disable basic
   lda #$36
   sta $01
@@ -40,6 +42,11 @@
   lda #>.BORDER_COLOR_IRQ
   sta $0315
   
+  ;disable CIA interrupt
+  lda #0
+  sta CIA1.IRQ_CONTROL
+  sta CIA2.NMI_CONTROL
+  
   ;setup raster line irq
   lda #%10000001
   sta VIC.IRQ_MASK
@@ -47,6 +54,8 @@
   sta VIC.CONTROL_1
   lda #0 ;we wanna wait for line zero
   sta VIC.RASTER_POS
+  
+  cli
   
   ;and start loading CORE,PRG
   lda #.CORE_FILE_NAME_END - .CORE_FILE_NAME
@@ -69,8 +78,8 @@
   
   .BORDER_COLOR_IRQ:
     ;respond to vic
-    lda #%00000000
-    sta VIC.IRQ_MASK
+    lda #%00001111
+    sta VIC.IRQ_REQUEST
   
     ;count frames
     inc .BORDER_FRAME_TIMER

@@ -59,11 +59,6 @@
     lda $05
     sta .IRQ.CHAIN + 2
     
-    lda #<.IRQ
-    sta $0314
-    lda #>.IRQ
-    sta $0315
-    
     ;setup input system
     lda #1
     sta $0289 ;disable buffer
@@ -80,8 +75,8 @@
     sta CIA2.DATA_PORT_A
     
     lda #0
-    sta VIC.BORDER_COLOR
-    sta VIC.BACKGROUND_COLOR
+    sta VIC.BORDER_COLOR ;black border
+    sta VIC.BACKGROUND_COLOR ;black background by default
     lda #%00010000 ;24 rows, char mode, vertical scroll middle
     sta VIC.CONTROL_1
     lda #%11010000 ;38 columns, multicolor mode.
@@ -103,6 +98,22 @@
     
   ;occurs in the background whilst VIC is doing literally anything.
   .GAME_LOOP:
+    ;change interrupt routine based on the engine's mode.
+    lda #<.IRQ.MENU
+    sta $0314
+    lda #>.IRQ.MENU
+    sta $0315
+    
+    ;TODO: change this based on engine mode, depends on our sprite multiplexing implementation research.
+    ;we only want to interrupt at the end of the frame.
+    ;setup raster line irq
+    lda #%00000001
+    sta VIC.IRQ_MASK
+    lda #%00010000 ;24 rows, char mode, vertical scroll middle, raster line target bit 8 set to 0
+    sta VIC.CONTROL_1
+    lda #252 ;we wanna wait for the bottom border to start
+    sta VIC.RASTER_POS
+  
     ;get key in
     jsr KERNAL.SCNKEY
     jsr KERNAL.GETIN
@@ -148,64 +159,58 @@
     cmp #.IRQ_WAIT_FLAGS.OVERDRAW_REACHED
     bne .RENDER_LOOP
     
+    ;instruct the vic to show the buffer we have been writing to during the game loop.
     jsr .SWAP_BUFFERS
     
-    ;TODO: flip colour buffer.
+    ;flip colour buffer (takes a hopeful 11,348 cycles, which theoretically stays behind the raster even in NTSC.  we'll find out if sprite multiplexing is happy with this.)
+    ldy #0
+    ldx #1 ;loop counter
     .COLOR_SWITCH:
-    
+      lda .COLOR_BACK_BUFFER,Y ;self modified
+      sta $d800,Y ;color ram.
+      iny
+      bne .COLOR_SWITCH ;branch if y has not returned to zero.
+      
+      inx
+      cpx #5 ;4 pages done, exit
+      beq .BUFFER_DONE
+      inc .COLOR_SWITCH + 2 ;change page
+      inc .COLOR_SWITCH + 5 ;change page
+      jmp .COLOR_SWITCH
     
     .BUFFER_DONE:
+      lda #>.COLOR_BACK_BUFFER ;reset indexes
+      sta .COLOR_SWITCH + 2
+      lda #$d8
+      sta .COLOR_SWITCH + 5
+    
       lda #.IRQ_WAIT_FLAGS.CLEARED
       sta .IRQ_WAIT_FLAGS
       jmp .GAME_LOOP
 
     
-  ;PRIVATE INTERRUPT
-  .IRQ:
+  ;PRIVATE INTERRUPTS
+  ;TODO: using the SID.
+  .IRQ.MENU:
     ;respond to the VIC immediately.  this engine uses the VIC to time absolutely everything.
-    lda #%00000000
-    sta VIC.IRQ_MASK
+    lda #%00001111
+    sta VIC.IRQ_REQUEST
     
-    ;TODO: increase registered timers here.
-  
-    lda .GAME_MODE
-    cmp #.GAME_MODE.GAMEPLAY
-    beq .IRQ.GAMEPLAY
+    ;the engine should stop waiting.  this means the buffers shall be flipped.
+    lda #.IRQ_WAIT_FLAGS.OVERDRAW_REACHED
+    sta .IRQ_WAIT_FLAGS
     
-    .IRQ.MENU:
-      ;TODO: no sprite multiplexing, just pull the bottom 8.
-      
-      ;TODO: sound during the border/blank
-      
-      ;we want to interrupt next time at the screen bottom.
-      
-    
-      jmp .IRQ.EXIT
-    
-    .IRQ.GAMEPLAY:
-      ;TODO: sprite multiplexing, this means the interrupt position will change every time.
-      
-      ;TODO: screen splitting
-      
-      ;TODO: sound during the border/blank
-      
-      ;and now we want to interrupt when the screen hits the bottom.
-    
-      jmp .IRQ.EXIT
-
-    .IRQ.EXIT:
-      ;don't respond to the engine if it isn't waiting.
-      ;this allows sprite multiplexing, timers and sound to tick even whilst the game is processing.
-      lda .IRQ_WAIT_FLAGS
-      cmp .IRQ_WAIT_FLAGS.PENDING_OVERDRAW
-      bne .IRQ.CHAIN
-      
-      ;the engine should stop waiting.  this means the buffers shall be flipped.
-      lda .IRQ_WAIT_FLAGS.OVERDRAW_REACHED
-      sta .IRQ_WAIT_FLAGS
-    
+    ;only menu mode allows KERNAL interrupts.
     .IRQ.CHAIN: 
       jmp $0000 ;self modified, usually ends up going back to KERNAL.
+  
+  .IRQ.GAMEPLAY:
+    ;TODO: sprite multiplexing, this means the interrupt position will change every time.
+    
+    ;TODO: screen splitting
+    
+    ;we can't allow kernal interrupts with this mode as we need too many cycles.
+    rti
       
   ;PRIVATE SUBROUTINES
   .SWAP_BUFFERS:
@@ -219,8 +224,7 @@
     eor #%00010000 ;switch to address $6800, or back.
     sta .BUFFER_SWITCH
     
-    .SWAP_BUFFERS.EXIT:
-      rts
+    rts
 
 ;PUBLIC SUBROUTINES
 !zone MENU
