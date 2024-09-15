@@ -7,7 +7,8 @@
 
 !zone CORE
 
-  .GAME_STATE = $0D
+  .GAME_STATE = $20
+  .NEW_GAME_STATE = $21
   
   .GAME_STATE.MAIN_MENU = 1
   .GAME_STATE.SAVE_MENU = 2
@@ -30,16 +31,14 @@
     ldy #>.MAIN_MENU
     jsr MENU.NEW_MENU
     
-    ;set engine to render it and not gameplay.
-    lda #ENGINE.GAME_MODE.MENU
-    sta ENGINE.GAME_MODE
+    jsr ENGINE.GO_MENU_MODE
     
   ;return to engine
     rts
     
   .LOOP:
   
-    ;TODO all menu functionality.
+    ;TODO game state machine
 
     ;return to engine
     rts

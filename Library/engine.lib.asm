@@ -11,15 +11,19 @@
   .JOY_IN = $05
   .BUFFER_SWITCH = $06
   .CHAR_SWITCH = $07
+  .BUFFER_POINTER_LO = $08
+  .BUFFER_POINTER_HI = $09
+  ;0A used by KERNAL LOAD/VERIFY switch
   
   ;irq wait flags
-  .IRQ_WAIT_FLAGS.CLEARED = %00000000
-  .IRQ_WAIT_FLAGS.PENDING_OVERDRAW = %10000000
-  .IRQ_WAIT_FLAGS.OVERDRAW_REACHED = %10000001
+  .IRQ_WAIT_FLAGS.PENDING_OVERDRAW = 1
+  .IRQ_WAIT_FLAGS.OVERDRAW_REACHED = 2
+  .IRQ_WAIT_FLAGS.CLEARED = 3
   
   ;game modes
   .GAME_MODE.MENU = 1
   .GAME_MODE.GAMEPLAY = 2
+  .GAME_MODE.MID_IRQ_GAMEPLAY = 3 ;a lightweight game mode used whilst the KERNAL is busy LOADing.
   
   ;VIC Buffer modes
   .VIC_BUFFER_1 = %10000000
@@ -45,7 +49,7 @@
   .LEVEL_TILES = $9800 ;tiles need to be 3x3, so the map itself is large.
   .LEVEL_MAP = $AC00 ;10 x 6 screens of 11x6 tiles (110 tiles wide, 36 tiles tall), or if vertical (square), 66 tiles by 60 tiles 
   .COLOR_BACK_BUFFER = $BC00
-  .SCRATCHPAD_MEMORY = $C000
+  .ENTITY_MEMORY = $C000
 
   * = .CORE_PRG
 
@@ -54,6 +58,8 @@
     ;override the loader's IRQ.
     ;we can't link the addresses in compilation in a specified order, so we just use the global variables in the zero page instead.
     ;we are also gonna reuse these variables later, so just extract directly.
+    sei
+    
     lda $04
     sta .IRQ.CHAIN + 1
     lda $05
@@ -89,31 +95,20 @@
     sta .CHAR_SWITCH
     lda #.GAME_MODE.MENU
     sta .GAME_MODE
+    lda #.IRQ_WAIT_FLAGS.CLEARED
+    sta .IRQ_WAIT_FLAGS
     
     jsr .SWAP_BUFFERS
     
     ;setup core.
     jsr SCRIPT.MENU_START
     
+    cli
+    
+    
     
   ;occurs in the background whilst VIC is doing literally anything.
   .GAME_LOOP:
-    ;change interrupt routine based on the engine's mode.
-    lda #<.IRQ.MENU
-    sta $0314
-    lda #>.IRQ.MENU
-    sta $0315
-    
-    ;TODO: change this based on engine mode, depends on our sprite multiplexing implementation research.
-    ;we only want to interrupt at the end of the frame.
-    ;setup raster line irq
-    lda #%00000001
-    sta VIC.IRQ_MASK
-    lda #%00010000 ;24 rows, char mode, vertical scroll middle, raster line target bit 8 set to 0
-    sta VIC.CONTROL_1
-    lda #252 ;we wanna wait for the bottom border to start
-    sta VIC.RASTER_POS
-  
     ;get key in
     jsr KERNAL.SCNKEY
     jsr KERNAL.GETIN
@@ -128,26 +123,24 @@
     ;only do the level's script and tilemap scrolling if we're in gameplay mode
     lda .GAME_MODE
     cmp #.GAME_MODE.MENU
-    beq .GAME_LOOP.MENU_LOOP
+    beq .GAME_LOOP.DRAW_MENU
     
     ;TODO back buffer rendering stuff for the map's scrolling
     
     .GAME_LOOP.RUN_LEVEL_SCRIPT:
       jsr $0000
-      
-    ;TODO render the current menu as a HUD.
-      
-    ;now run the main script.
-    jmp .GAME_LOOP.RUN_MAIN_SCRIPT
-      
-    ;rendering the screen as a menu instead of gameplay was requested...
-    .GAME_LOOP.MENU_LOOP:
-      
-      ;TODO render the menu as the whole screen.
+      jmp .GAME_LOOP.DRAW_MENU
+    
+    ;now we draw the menu.
+    ;note that the menu must have been setup to the correct size otherwise garbage shows up.
+    .GAME_LOOP.DRAW_MENU:
+      jsr MENU.INTERPRET_MENU
 
     ;now run the main script no matter which screen mode.
     .GAME_LOOP.RUN_MAIN_SCRIPT:
       jsr $0000
+      
+      
       
     ;and now we wait for overdraw
     lda #.IRQ_WAIT_FLAGS.PENDING_OVERDRAW
@@ -162,7 +155,7 @@
     ;instruct the vic to show the buffer we have been writing to during the game loop.
     jsr .SWAP_BUFFERS
     
-    ;flip colour buffer (takes a hopeful 11,348 cycles, which theoretically stays behind the raster even in NTSC.  we'll find out if sprite multiplexing is happy with this.)
+    ;flip colour buffer (TODO: might need something different for NTSC.)
     ldy #0
     ldx #1 ;loop counter
     .COLOR_SWITCH:
@@ -184,11 +177,13 @@
       lda #$d8
       sta .COLOR_SWITCH + 5
     
+      ;reset wait flag and loop the engine.
       lda #.IRQ_WAIT_FLAGS.CLEARED
       sta .IRQ_WAIT_FLAGS
       jmp .GAME_LOOP
 
     
+      
   ;PRIVATE INTERRUPTS
   ;TODO: using the SID.
   .IRQ.MENU:
@@ -197,6 +192,9 @@
     sta VIC.IRQ_REQUEST
     
     ;the engine should stop waiting.  this means the buffers shall be flipped.
+    lda .IRQ_WAIT_FLAGS
+    cmp #.IRQ_WAIT_FLAGS.PENDING_OVERDRAW
+    bne .IRQ.CHAIN ;don't allow the buffers to flip until the core is done drawing.
     lda #.IRQ_WAIT_FLAGS.OVERDRAW_REACHED
     sta .IRQ_WAIT_FLAGS
     
@@ -209,10 +207,12 @@
     
     ;TODO: screen splitting
     
-    ;we can't allow kernal interrupts with this mode as we need too many cycles.
+    ;we can't allow KERNAL interrupt routines with this mode as we need too many cycles.
     rti
-      
-  ;PRIVATE SUBROUTINES
+ 
+    
+    
+  ;PUBLIC SUBROUTINES
   .SWAP_BUFFERS:
     ;combine the buffer switch and char switch into one vic memory map.
     lda .BUFFER_SWITCH
@@ -224,44 +224,83 @@
     eor #%00010000 ;switch to address $6800, or back.
     sta .BUFFER_SWITCH
     
+    ;buffer bank for mathematic addressing is done via this.
+    lda .BUFFER_SWITCH ;consider the switch the high byte of the buffer pointer.
+    ror ;divide by 4.
+    ror 
+    ora #%01000000 ;address to bank 2.
+    sta .BUFFER_POINTER_HI ;we don't touch LO as other routines can handle that assuming 0 is the bottom.
+    
     rts
+
+  ;NOTE: programmers should sei and cli to prevent VIC interruptions at weird times, such as sprite multiplexing
+  .GO_MENU_MODE:
+    ;change interrupt routine based on the engine's mode.
+    lda #<.IRQ.MENU
+    sta $0314
+    lda #>.IRQ.MENU
+    sta $0315
+    
+    ;we only want to interrupt at the end of the frame.
+    ;setup raster line irq
+    lda #%00000001
+    sta VIC.IRQ_MASK
+    lda #%00010000 ;24 rows, char mode, vertical scroll middle, raster line target bit 8 set to 0
+    sta VIC.CONTROL_1
+    lda #252 ;we wanna wait for the bottom border to start
+    sta VIC.RASTER_POS
+    
+    ;set engine to render to menu-only mode.
+    lda #ENGINE.GAME_MODE.MENU
+    sta ENGINE.GAME_MODE
+    
+    rts
+    
+    
 
 ;PUBLIC SUBROUTINES
 !zone MENU
   
   ;variables
-  .OPTIONS = $08
-  .OPTIONS_END = $09
-  ;0A used by KERNAL LOAD/VERIFY switch
-  .TYPE = $0B
-  .SELECTION = $0C
+  .OPTIONS_LO = $10
+  .OPTIONS_HI = $11
+  .TYPE = $12
+  ;$13 is used by Current I/O Device Number
+  .SELECTION = $14
+  .BACKGROUND_FINISHED = $15
   
-  ;menu types
+  ;menu types (these really only change the input controls)
   .TYPE.LIST = 1
   .TYPE.GRID = 2
   
-  .ELEMENT.END = 1
-  .ELEMENT.TEXT = 2
-  .ELEMENT.ICON = 3
-  .ELEMENT.CHOICE = 4
-  .ELEMENT.CHOICE.ON_SELECT = 5
-  .ELEMENT.CHOICE.ON_CHOSEN = 6
-  .ELEMENT.CHOICE.ON_NOT_CHOSEN = 7
-  .ELEMENT.COLOR = 8
-  .ELEMENT.BACK_COLOR_1 = 9
-  .ELEMENT.BACK_COLOR_2 = 10
-  .ELEMENT.BACK_COLOR_3 = 11
+  .ELEMENT.TEXT = 1
+  .ELEMENT.ICON = 2
+  .ELEMENT.CHOICE = 3
+  .ELEMENT.CHOICE.ON_SELECT = 4
+  .ELEMENT.CHOICE.ON_CHOSEN = 5
+  .ELEMENT.CHOICE.ON_NOT_CHOSEN = 6
+  .ELEMENT.COLOR = 7
+  .ELEMENT.BACK_COLOR_1 = 8
+  .ELEMENT.FORE_COLOR_1 = 9
+  .ELEMENT.FORE_COLOR_2 = 10
+  .ELEMENT.BACKGROUND_ROUTINE = 11
+  .ELEMENT.END = 12
   
   .NEW_MENU:
     ;store parameters
     sta .TYPE
-    stx .OPTIONS
-    sty .OPTIONS_END
+    stx .OPTIONS_LO
+    sty .OPTIONS_HI
     
     ;reset menu selection
     lda #0
     sta .SELECTION
     
+    rts
+
+  .INTERPRET_MENU:
+    ;TODO
+  
     rts
 
 !zone SCRIPT
