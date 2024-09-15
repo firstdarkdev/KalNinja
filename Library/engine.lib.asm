@@ -42,8 +42,8 @@
   .LEVEL_QUIET_MUSIC = $8000
   .LEVEL_DYNAMIC_MUSIC = $8800
   .LEVEL_SFX = $9000
-  .LEVEL_TILES = $9800
-  .LEVEL_MAP = $AC00
+  .LEVEL_TILES = $9800 ;tiles need to be 3x3, so the map itself is large.
+  .LEVEL_MAP = $AC00 ;10 x 6 screens of 11x6 tiles (110 tiles wide, 36 tiles tall), or if vertical (square), 66 tiles by 60 tiles 
   .COLOR_BACK_BUFFER = $BC00
   .SCRATCHPAD_MEMORY = $C000
 
