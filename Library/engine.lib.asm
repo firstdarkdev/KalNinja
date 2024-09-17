@@ -139,6 +139,8 @@
     .GAME_LOOP.RUN_MAIN_SCRIPT:
       jsr $0000
       
+    ;TODO: entity scripts
+    
       
       
   ;and now we wait for overdraw
@@ -153,6 +155,8 @@
     
     ;instruct the vic to show the buffer we have been writing to during the game loop.
     jsr .SWAP_BUFFERS
+    
+    ;TODO: sort sprites now, hopefully fast enough that the colour buffer remains in time.
     
     ;flip colour buffer
     lda #>.COLOR_BACK_BUFFER
