@@ -131,7 +131,7 @@
       jmp .GAME_LOOP.DRAW_MENU
     
     ;now we draw the menu.
-    ;note that the menu must have been setup to the correct size otherwise garbage shows up.
+    ;note that the menu must have been setup correctly by the programmer otherwise garbage shows up.
     .GAME_LOOP.DRAW_MENU:
       jsr MENU.INTERPRET_MENU
 
@@ -154,7 +154,8 @@
     ;instruct the vic to show the buffer we have been writing to during the game loop.
     jsr .SWAP_BUFFERS
     
-    ;flip colour buffer (TODO: might need something different for NTSC.)
+    ;flip colour buffer 
+    ;TODO: generalize this function as the memory copy routine may be useful for other things.
     ldy #0
     ldx #1 ;loop counter
     .COLOR_SWITCH:
@@ -266,24 +267,26 @@
   .TYPE = $12
   ;$13 is used by Current I/O Device Number
   .SELECTION = $14
-  .BACKGROUND_FINISHED = $15
+  .CURRENT_INSTRUCTION = $15
+  .CURRENT_BYTE = $16
+  .CHOICE_POINTER.LO = $17
+  .CHOICE_POINTER.HI = $18
   
   ;menu types (these really only change the input controls)
+  .TYPE.CLOSED = 0
   .TYPE.LIST = 1
   .TYPE.GRID = 2
   
   .ELEMENT.TEXT = 1
+  .ELEMENT.TEXT.END = $2020
   .ELEMENT.ICON = 2
   .ELEMENT.CHOICE = 3
   .ELEMENT.CHOICE.ON_SELECT = 4
   .ELEMENT.CHOICE.ON_CHOSEN = 5
   .ELEMENT.CHOICE.ON_NOT_CHOSEN = 6
-  .ELEMENT.COLOR = 7
-  .ELEMENT.BACK_COLOR_1 = 8
-  .ELEMENT.FORE_COLOR_1 = 9
-  .ELEMENT.FORE_COLOR_2 = 10
-  .ELEMENT.BACKGROUND_ROUTINE = 11
-  .ELEMENT.END = 12
+  .ELEMENT.CHOICE.END = 7
+  .ELEMENT.BACKGROUND_ROUTINE = 8
+  .ELEMENT.END = 9
   
   .NEW_MENU:
     ;store parameters
@@ -300,6 +303,16 @@
   .INTERPRET_MENU:
     ;TODO
   
+    rts
+    
+  ;this routine is only required if you want total control of the screen!
+  .END_MENU:
+    ;reset menu pointers so the menu does not get interpreted.
+    lda #0
+    sta .OPTIONS_LO
+    sta .OPTIONS_HI
+    sta .TYPE
+    
     rts
 
 !zone SCRIPT
