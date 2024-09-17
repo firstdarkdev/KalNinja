@@ -141,9 +141,9 @@
       
       
       
-    ;and now we wait for overdraw
-    lda #.IRQ_WAIT_FLAGS.PENDING_OVERDRAW
-    sta .IRQ_WAIT_FLAGS
+  ;and now we wait for overdraw
+  lda #.IRQ_WAIT_FLAGS.PENDING_OVERDRAW
+  sta .IRQ_WAIT_FLAGS
     
   ;rendering occurs the moment raster enters overdraw so that colour data gets copied at the right timings.
   .RENDER_LOOP:
@@ -154,33 +154,16 @@
     ;instruct the vic to show the buffer we have been writing to during the game loop.
     jsr .SWAP_BUFFERS
     
-    ;flip colour buffer 
-    ;TODO: generalize this function as the memory copy routine may be useful for other things.
-    ldy #0
-    ldx #1 ;loop counter
-    .COLOR_SWITCH:
-      lda .COLOR_BACK_BUFFER,Y ;self modified
-      sta $d800,Y ;color ram.
-      iny
-      bne .COLOR_SWITCH ;branch if y has not returned to zero.
-      
-      inx
-      cpx #5 ;4 pages done, exit
-      beq .BUFFER_DONE
-      inc .COLOR_SWITCH + 2 ;change page
-      inc .COLOR_SWITCH + 5 ;change page
-      jmp .COLOR_SWITCH
+    ;flip colour buffer
+    lda #>.COLOR_BACK_BUFFER
+    ldx #4 ;all 1K of it.
+    ldy #$d8 ;into color ram pages.
+    jsr .COPY_PAGES
     
-    .BUFFER_DONE:
-      lda #>.COLOR_BACK_BUFFER ;reset indexes
-      sta .COLOR_SWITCH + 2
-      lda #$d8
-      sta .COLOR_SWITCH + 5
-    
-      ;reset wait flag and loop the engine.
-      lda #.IRQ_WAIT_FLAGS.CLEARED
-      sta .IRQ_WAIT_FLAGS
-      jmp .GAME_LOOP
+    ;reset wait flag and loop the engine.
+    lda #.IRQ_WAIT_FLAGS.CLEARED
+    sta .IRQ_WAIT_FLAGS
+    jmp .GAME_LOOP
 
     
       
@@ -256,8 +239,56 @@
     
     rts
     
+  ;Fills 256 byte pages with the same character.  As fast as possible.
+  ;Accumulator contains byte to fill, X contains page count to do, Y contains page high byte pointer.
+  .FILL_PAGES:
+    sty .FILL_PAGES.LOOP + 2 ;store page high byte.
     
-
+    ldy #0
+    
+    .FILL_PAGES.LOOP:
+      sta $0000,Y ;self modified at the start.
+      iny
+      bne .FILL_PAGES.LOOP
+    
+      dex
+      beq .FILL_PAGES.DONE ;all pages done.
+      inc .FILL_PAGES.LOOP + 2 ;next page
+      jmp .FILL_PAGES.LOOP
+    
+    .FILL_PAGES.DONE:
+      rts
+    
+  ;Copies 256 byte pages.  As fast as possible.
+  ;Accumulator contains page to copy, X contains page count to do, Y contains page destination.
+  .COPY_PAGES:
+    sta .COPY_PAGES.LOOP + 2
+    sty .COPY_PAGES.LOOP + 5  
+  
+    ldy #0
+  
+    .COPY_PAGES.LOOP:
+      lda $0000,Y ;self modified
+      sta $0000,Y ;self modified
+      iny
+      bne .COPY_PAGES.LOOP ;branch if y has not returned to zero.
+      
+      dex
+      beq .COPY_PAGES.DONE ;all pages done
+      inc .COPY_PAGES.LOOP + 2 ;change page
+      inc .COPY_PAGES.LOOP + 5 ;change page
+      jmp .COPY_PAGES.LOOP
+    
+    .COPY_PAGES.DONE:
+      rts
+      
+  .SET_CHAR_MULTICOLORS:
+    sta VIC.BACKGROUND_COLOR
+    stx VIC.CHARSET_MULTICOLOR_1
+    sty VIC.CHARSET_MULTICOLOR_2
+    rts
+  
+  
 ;PUBLIC SUBROUTINES
 !zone MENU
   

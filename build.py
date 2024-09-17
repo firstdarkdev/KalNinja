@@ -57,7 +57,7 @@ def compile_labels(path):
                 target_file_name = source.rstrip(".lib.asm") + ".asm"
                 artifact_to_delete = os.getcwd() + "\\" + artifact_name
 
-                subprocess.run([compiler_path, source, "-l", target_file_name, "-o", artifact_name])
+                subprocess.run([compiler_path, source, "-l", target_file_name, "-o", artifact_name, "-i", "W1000"])
                 os.remove(artifact_to_delete)
 
 compile_labels("Library\\")
@@ -78,7 +78,7 @@ def compile(path):
 
                 files_for_disk.append(build_location)
 
-                subprocess.run([compiler_path, source, "-f", "CBM", "-o", build_location])
+                subprocess.run([compiler_path, source, "-f", "CBM", "-o", build_location, "-i", "W1000"])
         if (len(files_for_disk) > 0):
             disk_name = dir_path.rstrip("/")
             disk_links[disk_name.lstrip(path)] = files_for_disk
