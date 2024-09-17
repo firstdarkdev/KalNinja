@@ -31,9 +31,10 @@
     ldy #>.MAIN_MENU
     jsr MENU.NEW_MENU
     
+    ;sei is already done in MENU_START, so no need to control interrupt here again.
     jsr ENGINE.GO_MENU_MODE
     
-  ;return to engine
+    ;return to engine
     rts
     
   .LOOP:
@@ -53,12 +54,9 @@
 
   !media "../../Characters/ui.charsetproject",char
 
-  * = ENGINE.PLAYER_SPRITE
+  * = ENGINE.CORE_SPRITE
 
   !media "../../Sprites/player.spriteproject",sprite,0,32
-
-  * = ENGINE.WEAPON_SPRITE
-
   !media "../../Sprites/weapon.spriteproject",sprite,0,64
 
 !zone
