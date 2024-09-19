@@ -11,8 +11,7 @@
   .JOY_IN = $05
   .BUFFER_SWITCH = $06
   .CHAR_SWITCH = $07
-  .BUFFER_POINTER_LO = $08
-  .BUFFER_POINTER_HI = $09
+  .BUFFER_POINTER_HI = $08
   ;0A used by KERNAL LOAD/VERIFY switch
   
   ;irq wait flags
@@ -162,7 +161,7 @@
     lda #>.COLOR_BACK_BUFFER
     ldx #4 ;all 1K of it.
     ldy #$d8 ;into color ram pages.
-    jsr .COPY_PAGES
+    jsr MEMORY.COPY_PAGES
     
     ;reset wait flag and loop the engine.
     lda #.IRQ_WAIT_FLAGS.CLEARED
@@ -216,7 +215,7 @@
     ror ;divide by 4.
     ror 
     ora #%01000000 ;address to bank 2.
-    sta .BUFFER_POINTER_HI ;we don't touch LO as other routines can handle that assuming 0 is the bottom.
+    sta .BUFFER_POINTER_HI ;we don't touch lo as other routines can handle that assuming 0 is the bottom.
     
     rts
 
@@ -243,57 +242,16 @@
     
     rts
     
-  ;Fills 256 byte pages with the same character.  As fast as possible.
-  ;Accumulator contains byte to fill, X contains page count to do, Y contains page high byte pointer.
-  .FILL_PAGES:
-    sty .FILL_PAGES.LOOP + 2 ;store page high byte.
-    
-    ldy #0
-    
-    .FILL_PAGES.LOOP:
-      sta $0000,Y ;self modified at the start.
-      iny
-      bne .FILL_PAGES.LOOP
-    
-      dex
-      beq .FILL_PAGES.DONE ;all pages done.
-      inc .FILL_PAGES.LOOP + 2 ;next page
-      jmp .FILL_PAGES.LOOP
-    
-    .FILL_PAGES.DONE:
-      rts
-    
-  ;Copies 256 byte pages.  As fast as possible.
-  ;Accumulator contains page to copy, X contains page count to do, Y contains page destination.
-  .COPY_PAGES:
-    sta .COPY_PAGES.LOOP + 2
-    sty .COPY_PAGES.LOOP + 5  
-  
-    ldy #0
-  
-    .COPY_PAGES.LOOP:
-      lda $0000,Y ;self modified
-      sta $0000,Y ;self modified
-      iny
-      bne .COPY_PAGES.LOOP ;branch if y has not returned to zero.
-      
-      dex
-      beq .COPY_PAGES.DONE ;all pages done
-      inc .COPY_PAGES.LOOP + 2 ;change page
-      inc .COPY_PAGES.LOOP + 5 ;change page
-      jmp .COPY_PAGES.LOOP
-    
-    .COPY_PAGES.DONE:
-      rts
-      
+  ;set the vic registers in an easily accessed manner.
   .SET_CHAR_MULTICOLORS:
     sta VIC.BACKGROUND_COLOR
     stx VIC.CHARSET_MULTICOLOR_1
     sty VIC.CHARSET_MULTICOLOR_2
     rts
+    
   
   
-;PUBLIC SUBROUTINES
+;PUBLIC SUBMODULES
 !zone MENU
   
   ;variables
@@ -349,6 +307,84 @@
     sta .TYPE
     
     rts
+    
+  ;A contains the character, X and Y contain the buffer index.
+  ;byte index is required in hopes the programmer will do the maths themselves, usually before actually coding.
+  .PUT_CHAR:
+    pha ;character to put
+    
+    txa ;hi byte.
+    adc ENGINE.BUFFER_POINTER_HI ;add the buffer ram pointer to it.
+    sta .PUT_CHAR.ADDRESS + 2
+    
+    pla ;get the character to put
+    .PUT_CHAR.ADDRESS:
+    sta $0000,Y ;self modifying
+  
+    rts
+    
+  ;A contains the character, X and Y contain the buffer index.
+  ;byte index is required in hopes the programmer will do the maths themselves, usually before actually coding.
+  .PUT_COLOR:
+    pha ;character to put
+    
+    txa ;hi byte.
+    adc #>ENGINE.COLOR_BACK_BUFFER ;add the buffer ram pointer to it.
+    sta .PUT_COLOR.ADDRESS + 2
+    
+    pla ;get the character to put
+    .PUT_COLOR.ADDRESS:
+    sta $0000,Y ;self modifying
+  
+    rts
+
+  
+
+!zone MEMORY
+  ;Fills 256 byte pages with the same character.  As fast as possible.
+  ;Accumulator contains byte to fill, X contains page count to do, Y contains page high byte pointer.
+  .FILL_PAGES:
+    sty .FILL_PAGES.LOOP + 2 ;store page high byte.
+    
+    ldy #0
+    
+    .FILL_PAGES.LOOP:
+      sta $0000,Y ;self modified at the start.
+      iny
+      bne .FILL_PAGES.LOOP
+    
+      dex
+      beq .FILL_PAGES.DONE ;all pages done.
+      inc .FILL_PAGES.LOOP + 2 ;next page
+      jmp .FILL_PAGES.LOOP
+    
+    .FILL_PAGES.DONE:
+      rts
+    
+  ;Copies 256 byte pages.  As fast as possible.
+  ;Accumulator contains page to copy, X contains page count to do, Y contains page destination.
+  .COPY_PAGES:
+    sta .COPY_PAGES.LOOP + 2
+    sty .COPY_PAGES.LOOP + 5  
+  
+    ldy #0
+  
+    .COPY_PAGES.LOOP:
+      lda $0000,Y ;self modified
+      sta $0000,Y ;self modified
+      iny
+      bne .COPY_PAGES.LOOP ;branch if y has not returned to zero.
+      
+      dex
+      beq .COPY_PAGES.DONE ;all pages done
+      inc .COPY_PAGES.LOOP + 2 ;change page
+      inc .COPY_PAGES.LOOP + 5 ;change page
+      jmp .COPY_PAGES.LOOP
+    
+    .COPY_PAGES.DONE:
+      rts
+     
+      
 
 !zone SCRIPT
   

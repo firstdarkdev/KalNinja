@@ -7,9 +7,8 @@
 
 !zone CORE
 
-  .GAME_STATE = $20
-  .NEW_GAME_STATE = $21
-  ;$24 to $29 are used for various operations, best not to use them to be safe from the KERNAL
+  .GAME_STATE = $FB
+  .NEW_GAME_STATE = $FC
   
   .GAME_STATE.MAIN_MENU = 1
   .GAME_STATE.SAVE_MENU = 2
@@ -51,7 +50,6 @@
     
   ;SUBROUTINES
 
-
     
 
   ;EVENTS
@@ -64,20 +62,59 @@
     lda #" "
     ldx #4 ;1KB of memory to fill
     ldy ENGINE.BUFFER_POINTER_HI
-    jsr ENGINE.FILL_PAGES
+    jsr MEMORY.FILL_PAGES
     
     ;event responded.
     rts
     
-  .MAIN_MENU.ADD_CURSOR:
-    ;TODO
+  .MAIN_MENU.NEW_GAME.ADD_CURSOR:
+    lda #">"
+    ;it is unbelievably fast to do the maths at coding time, so let's just do that...
+    ldx #%00000001
+    ldy #%11101111
+    jsr MENU.PUT_CHAR
+    
+    lda #1 ;white
+    jsr MENU.PUT_COLOR
   
     rts
     
-  .MAIN_MENU.REMOVE_CURSOR:
-    ;TODO
+  .MAIN_MENU.NEW_GAME.REMOVE_CURSOR:
+    lda #" "
+    ;it is unbelievably fast to do the maths at coding time, so let's just do that...
+    ldx #%00000001
+    ldy #%11101111
+    jsr MENU.PUT_CHAR
     
+    lda #0 ;black
+    jsr MENU.PUT_COLOR
+  
     rts
+  
+  .MAIN_MENU.LOAD_GAME.ADD_CURSOR:
+    lda #">"
+    ;it is unbelievably fast to do the maths at coding time, so let's just do that...
+    ldx #%00000010
+    ldy #%11101111
+    jsr MENU.PUT_CHAR
+    
+    lda #1 ;white
+    jsr MENU.PUT_COLOR
+  
+    rts
+    
+  .MAIN_MENU.LOAD_GAME.REMOVE_CURSOR:
+    lda #" "
+    ;it is unbelievably fast to do the maths at coding time, so let's just do that...
+    ldx #%00000010
+    ldy #%11101111
+    jsr MENU.PUT_CHAR
+    
+    lda #0 ;black
+    jsr MENU.PUT_COLOR
+  
+    rts
+  
     
   .MAIN_MENU.ON_NEW_GAME:
     ;set the engine to "load level mode" so it will escape correctly when the engine has stopped loading.
@@ -124,9 +161,9 @@
         !text "NEW GAME"
         .MAIN_MENU.NEW_GAME.END:
       !byte MENU.ELEMENT.CHOICE.ON_CHOSEN
-        !byte <.MAIN_MENU.ADD_CURSOR, >.MAIN_MENU.ADD_CURSOR
+        !byte <.MAIN_MENU.NEW_GAME.ADD_CURSOR, >.MAIN_MENU.NEW_GAME.ADD_CURSOR
       !byte MENU.ELEMENT.CHOICE.ON_NOT_CHOSEN
-        !byte <.MAIN_MENU.REMOVE_CURSOR, >.MAIN_MENU.REMOVE_CURSOR
+        !byte <.MAIN_MENU.NEW_GAME.REMOVE_CURSOR, >.MAIN_MENU.NEW_GAME.REMOVE_CURSOR
       !byte MENU.ELEMENT.CHOICE.ON_SELECT
         !byte <.MAIN_MENU.ON_NEW_GAME, >.MAIN_MENU.ON_NEW_GAME
         
@@ -137,9 +174,9 @@
         !text "LOAD GAME"
         .MAIN_MENU.LOAD_GAME.END:
       !byte MENU.ELEMENT.CHOICE.ON_CHOSEN
-        !byte <.MAIN_MENU.ADD_CURSOR, >.MAIN_MENU.ADD_CURSOR
+        !byte <.MAIN_MENU.LOAD_GAME.ADD_CURSOR, >.MAIN_MENU.LOAD_GAME.ADD_CURSOR
       !byte MENU.ELEMENT.CHOICE.ON_NOT_CHOSEN
-        !byte <.MAIN_MENU.REMOVE_CURSOR, >.MAIN_MENU.REMOVE_CURSOR
+        !byte <.MAIN_MENU.LOAD_GAME.REMOVE_CURSOR, >.MAIN_MENU.LOAD_GAME.REMOVE_CURSOR
       !byte MENU.ELEMENT.CHOICE.ON_SELECT
         !byte <.MAIN_MENU.ON_LOAD_GAME, >.MAIN_MENU.ON_LOAD_GAME
       
@@ -147,11 +184,10 @@
 
   * = ENGINE.UI_CHAR
 
-  !media "../../Characters/ui.charsetproject",char
+  !media "../../Characters/core.charsetproject",char
 
   * = ENGINE.CORE_SPRITE
 
-  !media "../../Sprites/player.spriteproject",sprite,0,32
-  !media "../../Sprites/weapon.spriteproject",sprite,0,64
+  !media "../../Sprites/core.spriteproject",sprite,0,96
 
 !zone
