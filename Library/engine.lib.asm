@@ -7,11 +7,9 @@
   ;variables
   .IRQ_WAIT_FLAGS = $02
   .GAME_MODE = $03
-  .KEY_IN = $04
-  .JOY_IN = $05
-  .BUFFER_SWITCH = $06
-  .CHAR_SWITCH = $07
-  .BUFFER_POINTER_HI = $08
+  .BUFFER_SWITCH = $04
+  .CHAR_SWITCH = $05
+  .BUFFER_POINTER_HI = $06
   ;0A used by KERNAL LOAD/VERIFY switch
   
   ;irq wait flags
@@ -107,16 +105,9 @@
     
   ;occurs in the background whilst VIC is doing literally anything.
   .GAME_LOOP:
-    ;get key in
-    jsr KERNAL.SCNKEY
-    jsr KERNAL.GETIN
-    sta .KEY_IN
-    
-    ;get joystick in
-    lda #0
-    sta CIA1.DATA_DIRECTION_REGISTER_B
-    lda CIA1.DATA_PORT_B
-    sta .JOY_IN
+    ;poll inputs
+    jsr INPUT.KEY.POLL
+    jsr INPUT.JOY.POLL
   
     ;only do the level's script and tilemap scrolling if we're in gameplay mode
     lda .GAME_MODE
@@ -132,7 +123,7 @@
     ;now we draw the menu.
     ;note that the menu must have been setup correctly by the programmer otherwise garbage shows up.
     .GAME_LOOP.DRAW_MENU:
-      jsr MENU.INTERPRET_MENU
+      jsr MENU.INTERPRET
 
     ;now run the main script no matter which screen mode.
     .GAME_LOOP.RUN_MAIN_SCRIPT:
@@ -255,59 +246,633 @@
 !zone MENU
   
   ;variables
-  .OPTIONS_LO = $10
-  .OPTIONS_HI = $11
-  .TYPE = $12
+  .OPTIONS.LO = $10
+  .OPTIONS.HI = $11
+  .OPEN = $12
   ;$13 is used by Current I/O Device Number
   .SELECTION = $14
-  .CURRENT_INSTRUCTION = $15
-  .CURRENT_BYTE = $16
-  .CHOICE_POINTER.LO = $17
-  .CHOICE_POINTER.HI = $18
+  .CHOICE_POINTER.LO = $15
+  .CHOICE_POINTER.HI = $16
+  .CHOICE.X = $17
+  .CHOICE.Y = $18
+  .CHOICE_DIMENSIONS.X = $19
+  .CHOICE_DIMENSIONS.Y = $1A
+  .B = $1B ;register B
+  .C = $1C ;register C
+  .CURRENT_CHOICE = $1D
+  .INPUT_ACTIVE = $1E
+  .SELECTED = $1F
   
-  ;menu types (these really only change the input controls)
-  .TYPE.CLOSED = 0
-  .TYPE.LIST = 1
-  .TYPE.GRID = 2
-  
+  .ELEMENT.END = 0
   .ELEMENT.TEXT = 1
-  .ELEMENT.TEXT.END = $2020
   .ELEMENT.ICON = 2
   .ELEMENT.CHOICE = 3
   .ELEMENT.CHOICE.ON_SELECT = 4
   .ELEMENT.CHOICE.ON_CHOSEN = 5
   .ELEMENT.CHOICE.ON_NOT_CHOSEN = 6
-  .ELEMENT.CHOICE.END = 7
-  .ELEMENT.BACKGROUND_ROUTINE = 8
-  .ELEMENT.END = 9
+  .ELEMENT.BACKGROUND = 7
   
-  .NEW_MENU:
+  
+  ;functions
+  .NEW:
     ;store parameters
-    sta .TYPE
-    stx .OPTIONS_LO
-    sty .OPTIONS_HI
+    stx .OPTIONS.LO
+    sty .OPTIONS.HI
+    
+    ;fast reset interpreter cursor 
+    txa
+    sta .INTERPRET.NEXT_BYTE + 1
+    tya
+    sta .INTERPRET.NEXT_BYTE + 2
+    
     
     ;reset menu selection
     lda #0
     sta .SELECTION
+    sta .INPUT_ACTIVE
+    
+    ;menu is open
+    lda #1
+    sta .OPEN
     
     rts
-
-  .INTERPRET_MENU:
-    ;TODO
+    
+    
+    
+  ;this routine is only required if you want total control of the screen!
+  .END:
+    ;reset menu pointers so the menu does not get interpreted.
+    lda #0
+    sta .OPTIONS.LO
+    sta .OPTIONS.HI
+    sta .OPEN
+    
+    ;reset selection cursor.
+    lda #1
+    sta .CHOICE.X
+    sta .CHOICE.Y
+    
+    rts
+    
+    
+    
+  ;allows the menu to take control of the joystick
+  .SUBSCRIBE_INPUT:
+    jsr INPUT.JOY.EVENTS.RESET
+  
+    ;let's only listen for press, release is ignored.
+    ldx #>.INTERPRET.ON_DOWN_PRESSED
+    ldy #<.INTERPRET.ON_DOWN_PRESSED
+    jsr INPUT.JOY.SUBSCRIBE.DOWN
+    ldx #>.INTERPRET.ON_UP_PRESSED
+    ldy #<.INTERPRET.ON_UP_PRESSED
+    jsr INPUT.JOY.SUBSCRIBE.UP
+    ldx #>.INTERPRET.ON_LEFT_PRESSED
+    ldy #<.INTERPRET.ON_LEFT_PRESSED
+    jsr INPUT.JOY.SUBSCRIBE.LEFT
+    ldx #>.INTERPRET.ON_RIGHT_PRESSED
+    ldy #<.INTERPRET.ON_RIGHT_PRESSED
+    jsr INPUT.JOY.SUBSCRIBE.RIGHT
+    ldx #>.INTERPRET.ON_FIRE_PRESSED
+    ldy #<.INTERPRET.ON_FIRE_PRESSED
+    jsr INPUT.JOY.SUBSCRIBE.FIRE
+    
+    ;forget that something was ever selected.
+    lda #0
+    sta .SELECTED
   
     rts
     
-  ;this routine is only required if you want total control of the screen!
-  .END_MENU:
-    ;reset menu pointers so the menu does not get interpreted.
+    
+
+  .INTERPRET:
+    lda .OPEN
+    beq .INTERPRET.EXIT ;don't do anything if the menu is closed.
+    
+    ;reset interpreter cursor 
+    lda .OPTIONS.LO
+    sta .INTERPRET.NEXT_BYTE + 1
+    lda .OPTIONS.HI
+    sta .INTERPRET.NEXT_BYTE + 2
+    
+    ;get dimensions of the menu choices.
+    jsr .INTERPRET.NEXT_BYTE
+    sta .CHOICE_DIMENSIONS.X
+    jsr .INTERPRET.NEXT_BYTE
+    sta .CHOICE_DIMENSIONS.Y
+    
+    ;reset the choice counter
     lda #0
-    sta .OPTIONS_LO
-    sta .OPTIONS_HI
-    sta .TYPE
+    sta .CURRENT_CHOICE
+    
+    ;don't waste cycles getting input if input isn't active.
+    lda .INPUT_ACTIVE
+    beq .INTERPRET.INSTRUCTION.LOOP ;zero disables input.
+    jsr INPUT.JOY.TEST
+   
+    .INTERPRET.INSTRUCTION.LOOP:
+      ;get instruction byte.
+      jsr .INTERPRET.NEXT_BYTE
+      beq .INTERPRET.EXIT ;the instruction was END, jump out immediately.
+      
+      ;setup decoding tree.
+      ;note that this means we only support up to 64 instructions in the menu interpreter.
+      rol ;multiply by four.
+      clc ;forget carries so nothing ends up at bit 0 next time.
+      rol 
+      sta .B ;store this for later addition.
+      
+      ;index where to jump to in the jump table.
+      ;note that the carry operation is only necessary as the compiler cannot guarantee where this instruction ends up.
+      lda #<.INTERPRET.INSTRUCTION.JUMP_TABLE ;add it to how many bytes we have to look into the table.
+      adc .B ;add it to the instruction jump table index
+      sta .INTERPRET.INSTRUCTION.JUMP + 1
+      bcc .INTERPRET.INSTRUCTION.JUMP ;jump now if we don't have to increment the high byte.  
+      inc .INTERPRET.INSTRUCTION.JUMP + 2 ;increment page because the carry was set when we added the lo byte.
+      
+      .INTERPRET.INSTRUCTION.JUMP:
+        jsr $0000 ;self modified
+        jmp .INTERPRET.INSTRUCTION.LOOP ;now get the next instruction.
+        
+      .INTERPRET.EXIT:
+        rts
+      
+      .INTERPRET.INSTRUCTION.JUMP_TABLE:
+        ;align in fours.
+        jmp .INTERPRET.INSTRUCTION.TEXT
+        !byte 0
+        jmp .INTERPRET.INSTRUCTION.ICON
+        !byte 0
+        jmp .INTERPRET.INSTRUCTION.CHOICE
+        !byte 0 
+        jmp .INTERPRET.INSTRUCTION.CHOICE.ON_SELECT
+        !byte 0 
+        jmp .INTERPRET.INSTRUCTION.CHOICE.ON_CHOSEN
+        !byte 0 
+        jmp .INTERPRET.INSTRUCTION.CHOICE.ON_NOT_CHOSEN
+        !byte 0 
+        jmp .INTERPRET.INSTRUCTION.BACKGROUND
+        !byte 0
+        
+        
+      
+      ;text has to be done as fast as possible.
+      ;so the coordinates are expected to be the index instead of an X and Y
+      ;this means the programmer must calculate the indexes ahead of time.  
+      .INTERPRET.INSTRUCTION.TEXT:
+        ;get cursor index
+        jsr .INTERPRET.NEXT_BYTE ;get lo byte of index.
+        tay
+        jsr .INTERPRET.NEXT_BYTE ;get hi byte of index.
+        tax
+        
+        ;get color
+        jsr .INTERPRET.NEXT_BYTE
+        sta .B ;store it for later.
+        
+        ;get string length.
+        jsr .INTERPRET.NEXT_BYTE
+        sta .C ;create a counter.
+        
+        ;now print the string and colour it.
+        .INTERPRET.INSTRUCTION.TEXT.LOOP:
+          ;now set the character and its colour.
+          ;the X and Y we got before are the index on the buffer to copy it to.
+          jsr .INTERPRET.NEXT_BYTE ;get character into A
+          jsr GRAPHICS.PUT_CHAR
+          lda .B ;get colour
+          jsr GRAPHICS.PUT_COLOR
+          
+          ;go to the next character.
+          dec .C ;decrement counter
+          beq .INTERPRET.INSTRUCTION.TEXT.EXIT ;the counter hit zero, we are done.
+          iny ;increment buffer index.
+          bcc .INTERPRET.INSTRUCTION.TEXT.LOOP
+          inx ;in the case of carry, we need to increment the page as 40 column rows doesn't math evenly all the time.
+          jmp .INTERPRET.INSTRUCTION.TEXT.LOOP
+        
+        .INTERPRET.INSTRUCTION.TEXT.EXIT:
+        rts
+        
+        
+      
+      .INTERPRET.INSTRUCTION.ICON:
+        ;TODO
+        
+        rts
+        
+        
+        
+      .INTERPRET.INSTRUCTION.CHOICE:
+        ;copy pointer to current choice
+        lda .INTERPRET.NEXT_BYTE + 1 ;lo byte
+        sta .CHOICE_POINTER.LO
+        lda .INTERPRET.NEXT_BYTE + 2 ;hi byte
+        sta MENU.CHOICE_POINTER.HI
+        
+        ;increment choice counter.
+        inc .CURRENT_CHOICE
+        
+        rts
+        
+      .INTERPRET.INSTRUCTION.CHOICE.ON_SELECT:
+        ;judge if the trigger was pulled AND this choice was chosen.
+        lda .CURRENT_CHOICE
+        cmp .SELECTION
+        bne .INTERPRET.INSTRUCTION.CHOICE.ON_SELECT.ABORT ;this object was not selected
+        lda .SELECTED
+        beq .INTERPRET.INSTRUCTION.CHOICE.ON_SELECT.ABORT ;the trigger was not pulled yet
+        
+        ;call the subscriber and return immediately.
+        jsr .INTERPRET.GO_POINTER
+        rts
+      
+        .INTERPRET.INSTRUCTION.CHOICE.ON_SELECT.ABORT:
+          ;trash the next two bytes (the pointer) and get the next instruction.
+          jsr .INTERPRET.NEXT_BYTE
+          jsr .INTERPRET.NEXT_BYTE
+          rts
+        
+      .INTERPRET.INSTRUCTION.CHOICE.ON_CHOSEN:
+        ;judge if this choice was chosen.
+        lda .CURRENT_CHOICE
+        cmp .SELECTION
+        bne .INTERPRET.INSTRUCTION.CHOICE.ON_CHOSEN.ABORT ;this object was not selected
+        
+        ;call the subscriber and return immediately.
+        jsr .INTERPRET.GO_POINTER
+        rts
+      
+        .INTERPRET.INSTRUCTION.CHOICE.ON_CHOSEN.ABORT:
+          ;trash the next two bytes (the pointer) and get the next instruction.
+          jsr .INTERPRET.NEXT_BYTE
+          jsr .INTERPRET.NEXT_BYTE
+          rts
+        
+      .INTERPRET.INSTRUCTION.CHOICE.ON_NOT_CHOSEN:
+        ;judge if this choice was not chosen.
+        lda .CURRENT_CHOICE
+        cmp .SELECTION
+        beq .INTERPRET.INSTRUCTION.CHOICE.ON_NOT_CHOSEN.ABORT ;this object was selected, ignore it.
+        
+        ;call the subscriber and return immediately.
+        jsr .INTERPRET.GO_POINTER
+        rts
+      
+        .INTERPRET.INSTRUCTION.CHOICE.ON_NOT_CHOSEN.ABORT:
+          ;trash the next two bytes (the pointer) and get the next instruction.
+          jsr .INTERPRET.NEXT_BYTE
+          jsr .INTERPRET.NEXT_BYTE
+          rts
+        
+      .INTERPRET.INSTRUCTION.BACKGROUND:
+        ;simply execute the routine provided.
+        jsr .INTERPRET.GO_POINTER
+      
+        rts
+        
+      
+      
+    ;subroutines
+    ;Loads A with next byte in the menu data.
+    .INTERPRET.NEXT_BYTE:
+      lda $0000 ;self modified.
+      inc .INTERPRET.NEXT_BYTE + 1 ;increment for next address in the future.
+      bcc .INTERPRET.NEXT_BYTE.EXIT
+      inc .INTERPRET.NEXT_BYTE + 2 ;increment page because carry was set.
+    
+      .INTERPRET.NEXT_BYTE.EXIT:
+      rts
+      
+    ;jsr using self modification by reading menu data.
+    .INTERPRET.GO_POINTER:
+      jsr .INTERPRET.NEXT_BYTE ;get lo byte
+      sta .INTERPRET.GO_POINTER.JUMP + 1
+      jsr .INTERPRET.NEXT_BYTE ;get hi byte
+      sta .INTERPRET.GO_POINTER.JUMP + 2
+    
+      .INTERPRET.GO_POINTER.JUMP:
+      jsr $0000 ;self modified
+      
+      rts
+      
+      
+      
+    ;go up in the choice grid.
+    .INTERPRET.ON_UP_PRESSED:
+      dec .CHOICE.Y
+      bne .INTERPRET.ON_UP_PRESSED.EXIT ;zero is out of bounds
+      lda .CHOICE_DIMENSIONS.Y
+      sta .CHOICE.Y
+    
+      .INTERPRET.ON_UP_PRESSED.EXIT:
+      jsr .INTERPRET.CHANGE_CHOSEN
+      rts
+      
+    ;go down in the choice grid.
+    .INTERPRET.ON_DOWN_PRESSED:
+      ldx .CHOICE.Y
+      inx
+      cpx .CHOICE_DIMENSIONS.Y 
+      bcc .INTERPRET.ON_DOWN_PRESSED.EXIT ;dimension maximum + 1 is out of bounds.
+      ldx #1
+      stx .CHOICE.Y
+    
+      .INTERPRET.ON_DOWN_PRESSED.EXIT:
+      jsr .INTERPRET.CHANGE_CHOSEN
+      rts
+      
+    ;go left in the choice grid
+    .INTERPRET.ON_LEFT_PRESSED:
+      dec .CHOICE.X
+      bne .INTERPRET.ON_LEFT_PRESSED.EXIT ;zero is out of bounds
+      lda .CHOICE_DIMENSIONS.X
+      sta .CHOICE.X
+    
+      .INTERPRET.ON_LEFT_PRESSED.EXIT:
+      jsr .INTERPRET.CHANGE_CHOSEN
+      rts
+      
+    ;go right in the choice grid
+    .INTERPRET.ON_RIGHT_PRESSED:
+      ldx .CHOICE.X
+      inx
+      cpx .CHOICE_DIMENSIONS.X
+      bcc .INTERPRET.ON_RIGHT_PRESSED.EXIT ;dimension maximum + 1 is out of bounds.
+      ldx #1
+      stx .CHOICE.X
+    
+      .INTERPRET.ON_RIGHT_PRESSED.EXIT:
+      jsr .INTERPRET.CHANGE_CHOSEN
+      rts
+      
+    ;select current choice.
+    .INTERPRET.ON_FIRE_PRESSED:
+      jsr .INTERPRET.CHANGE_CHOSEN
+      jsr .FINALIZE_SELECTION
+    
+      rts
+      
+    ;gets the index out of the coordinates given within the boundaries of the menu.
+    ;A contains a copy of selection.
+    .INTERPRET.CHANGE_CHOSEN:
+      lda #0
+      sta .SELECTION
+      ldx .CHOICE.X
+      ldy .CHOICE.Y
+      
+      ;for every index on the coordinate table, increment the selection.
+      .INTERPRET.CHANGE_CHOSEN.LOOP:
+        inc .SELECTION
+        dex
+        bne .INTERPRET.CHANGE_CHOSEN.LOOP ;whilst x has not hit zero...
+        dey
+        beq .INTERPRET.CHANGE_CHOSEN.EXIT ;if all rows have elapsed, we're done.
+        ldx .CHOICE_DIMENSIONS.X ;next row.
+    
+      .INTERPRET.CHANGE_CHOSEN.EXIT:
+        lda .SELECTION
+        rts
+      
+    ;enforce a selection in the menu based on a chosen choice.
+    ;useful for initializing a menu with a selection already made.
+    ;A contains a new value for SELECTION
+    .FINALIZE_SELECTION:
+      sta .SELECTION
+      lda #1
+      sta .SELECTED
+      
+      rts
+
+
+
+!zone INPUT
+  .JOY.IN = $20
+  .JOY.OLD = $21
+  ;$22-$25 are used for "various operations", best not to mess with it.
+  .KEY.IN = $26
+  .KEY.OLD = $27
+  .JOY.CHANGED.ON = $28
+  .JOY.CHANGED.OFF = $29
+  
+  .JOY.EVENTS.RESET:
+    ldy #<.DO_NOTHING
+    ldx #>.DO_NOTHING
+    
+    sty .JOY.TEST.UP + 2
+    stx .JOY.TEST.UP + 1
+    sty .JOY.TEST.DOWN + 2
+    stx .JOY.TEST.DOWN + 1
+    sty .JOY.TEST.RIGHT + 2
+    stx .JOY.TEST.RIGHT + 1
+    sty .JOY.TEST.LEFT + 2
+    stx .JOY.TEST.LEFT + 1
+    sty .JOY.TEST.FIRE + 2
+    stx .JOY.TEST.FIRE + 1
+    sty .JOY.TEST.UP.RELEASE + 2
+    stx .JOY.TEST.UP.RELEASE + 1
+    sty .JOY.TEST.DOWN.RELEASE + 2
+    stx .JOY.TEST.DOWN.RELEASE + 1
+    sty .JOY.TEST.RIGHT.RELEASE + 2
+    stx .JOY.TEST.RIGHT.RELEASE + 1
+    sty .JOY.TEST.LEFT.RELEASE + 2
+    stx .JOY.TEST.LEFT.RELEASE + 1
+    sty .JOY.TEST.FIRE.RELEASE + 2
+    stx .JOY.TEST.FIRE.RELEASE + 1
+    
+    rts
+  
+    
+      
+  .JOY.POLL:
+    ;shove away old input.
+    lda .JOY.IN
+    sta .JOY.OLD
+  
+    ;instruct CIA1 to get joystick input.
+    lda #0
+    sta CIA1.DATA_DIRECTION_REGISTER_B
+    lda CIA1.DATA_PORT_B
+    sta .JOY.IN
+    
+    rts
+      
+    
+  
+  ;test and fire events according to changes in the input, ignoring holds.
+  .JOY.TEST:
+    ;find out which buttons have been changed to on and which ones off.
+    lda .JOY.IN ;get current CIA result
+    eor .JOY.OLD ;only show flags that are new.
+    sta .JOY.CHANGED.ON ;store temporarily.
+    lda .JOY.OLD ;look back at the old ones.
+    and .JOY.CHANGED.ON ;see if any match the new one.
+    sta .JOY.CHANGED.OFF ;ones that are in the old one are treated as now off.
+    eor .JOY.CHANGED.ON ;only ones that were not in the old one are treated as now turned on.
+    sta .JOY.CHANGED.ON ;store result for the ones now treated as on.
+  
+    ;choose an input routine for directions
+    ;note the joystick cannot be in both opposite directions at once.  
+    lda .JOY.CHANGED.ON
+    and #%00000001 ;up 
+    bne .JOY.TEST.UP
+    lda .JOY.IN
+    and #%00000010 ;down
+    bne .JOY.TEST.DOWN
+    .JOY.TEST.RIGHT_LEFT_TEST:
+    lda .JOY.IN
+    and #%00000100 ;left 
+    bne .JOY.TEST.RIGHT
+    lda .JOY.IN
+    and #%00001000 ;right
+    bne .JOY.TEST.LEFT
+    .JOY.TEST.FIRE_TEST:
+    lda .JOY.IN
+    and #%00010000 ;fire
+    bne .JOY.TEST.FIRE
+    
+    .JOY.TEST.UP_DOWN_TEST.RELEASE:
+    lda .JOY.CHANGED.OFF
+    and #%00000001 ;up 
+    bne .JOY.TEST.UP.RELEASE
+    lda .JOY.IN
+    and #%00000010 ;down
+    bne .JOY.TEST.DOWN.RELEASE
+    .JOY.TEST.RIGHT_LEFT_TEST.RELEASE:
+    lda .JOY.IN
+    and #%00000100 ;left 
+    bne .JOY.TEST.RIGHT.RELEASE
+    lda .JOY.IN
+    and #%00001000 ;right
+    bne .JOY.TEST.LEFT.RELEASE
+    .JOY.TEST.FIRE_TEST.RELEASE:
+    lda .JOY.IN
+    and #%00010000 ;fire
+    bne .JOY.TEST.FIRE.RELEASE
+    
+    .JOY.TEST.EXIT:
+    rts
+    
+    .JOY.TEST.UP:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.RIGHT_LEFT_TEST
+      
+    .JOY.TEST.DOWN:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.RIGHT_LEFT_TEST
+      
+    .JOY.TEST.RIGHT:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.FIRE_TEST
+      
+    .JOY.TEST.LEFT:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.FIRE_TEST
+      
+    .JOY.TEST.FIRE:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.UP_DOWN_TEST.RELEASE
+      
+    .JOY.TEST.UP.RELEASE:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.RIGHT_LEFT_TEST.RELEASE
+      
+    .JOY.TEST.DOWN.RELEASE:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.RIGHT_LEFT_TEST.RELEASE
+      
+    .JOY.TEST.RIGHT.RELEASE:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.FIRE_TEST.RELEASE
+      
+    .JOY.TEST.LEFT.RELEASE:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.FIRE_TEST.RELEASE
+      
+    .JOY.TEST.FIRE.RELEASE:
+      jsr .DO_NOTHING ;self modified
+      jmp .JOY.TEST.EXIT
+     
+      
+      
+  .KEY.POLL:
+    ;shove away old input
+    lda .KEY.IN
+    sta .KEY.OLD
+  
+    ;utilize kernal routines to get keyboard input.
+    jsr KERNAL.SCNKEY
+    jsr KERNAL.GETIN
+    sta .KEY.IN
     
     rts
     
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.UP:
+    stx .JOY.TEST.UP + 2
+    sty .JOY.TEST.UP + 1
+    rts
+    
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.DOWN:
+    stx .JOY.TEST.DOWN + 2
+    sty .JOY.TEST.DOWN + 1
+    rts
+    
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.RIGHT:
+    stx .JOY.TEST.RIGHT + 2
+    sty .JOY.TEST.RIGHT + 1
+    rts
+    
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.LEFT:
+    stx .JOY.TEST.LEFT + 2
+    sty .JOY.TEST.LEFT + 1
+    rts
+    
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.FIRE:
+    stx .JOY.TEST.FIRE + 2
+    sty .JOY.TEST.FIRE + 1
+    rts
+    
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.UP.RELEASE:
+    stx .JOY.TEST.UP.RELEASE + 2
+    sty .JOY.TEST.UP.RELEASE + 1
+    rts
+    
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.DOWN.RELEASE:
+    stx .JOY.TEST.DOWN.RELEASE + 2
+    sty .JOY.TEST.DOWN.RELEASE + 1
+    rts
+    
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.RIGHT.RELEASE:
+    stx .JOY.TEST.RIGHT.RELEASE + 2
+    sty .JOY.TEST.RIGHT.RELEASE + 1
+    rts
+    
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.LEFT.RELEASE:
+    stx .JOY.TEST.LEFT.RELEASE + 2
+    sty .JOY.TEST.LEFT.RELEASE + 1
+    rts
+    
+  ;X contains hi, Y contains lo.
+  .JOY.SUBSCRIBE.FIRE.RELEASE:
+    stx .JOY.TEST.FIRE.RELEASE + 2
+    sty .JOY.TEST.FIRE.RELEASE + 1
+    rts
+  
+  ;also used for making an event do nothing.
+  .DO_NOTHING:
+    rts
+  
+
+!zone GRAPHICS
   ;A contains the character, X and Y contain the buffer index.
   ;byte index is required in hopes the programmer will do the maths themselves, usually before actually coding.
   .PUT_CHAR:
@@ -337,8 +902,8 @@
     sta $0000,Y ;self modifying
   
     rts
-
-  
+    
+    
 
 !zone MEMORY
   ;Fills 256 byte pages with the same character.  As fast as possible.

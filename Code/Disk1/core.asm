@@ -26,16 +26,17 @@
     jsr SCRIPT.REGISTER_MAIN_LOOP
     
     ;setup main menu
-    lda #MENU.TYPE.LIST
     ldx #<.MAIN_MENU
     ldy #>.MAIN_MENU
-    jsr MENU.NEW_MENU
+    jsr MENU.NEW
+    jsr MENU.SUBSCRIBE_INPUT
     
+    ;initialize the game state machine
     lda #.GAME_STATE.MAIN_MENU
     sta .GAME_STATE
     sta .NEW_GAME_STATE
     
-    ;sei is already done in MENU_START, so no need to control interrupt here again.
+    ;sei and cli is already done in MENU_START, so no need to control interrupt here again.
     jsr ENGINE.GO_MENU_MODE
     
     ;return to engine
@@ -72,10 +73,10 @@
     ;it is unbelievably fast to do the maths at coding time, so let's just do that...
     ldx #%00000001
     ldy #%11101111
-    jsr MENU.PUT_CHAR
+    jsr GRAPHICS.PUT_CHAR
     
     lda #1 ;white
-    jsr MENU.PUT_COLOR
+    jsr GRAPHICS.PUT_COLOR
   
     rts
     
@@ -84,10 +85,10 @@
     ;it is unbelievably fast to do the maths at coding time, so let's just do that...
     ldx #%00000001
     ldy #%11101111
-    jsr MENU.PUT_CHAR
+    jsr GRAPHICS.PUT_CHAR
     
     lda #0 ;black
-    jsr MENU.PUT_COLOR
+    jsr GRAPHICS.PUT_COLOR
   
     rts
   
@@ -96,10 +97,10 @@
     ;it is unbelievably fast to do the maths at coding time, so let's just do that...
     ldx #%00000010
     ldy #%11101111
-    jsr MENU.PUT_CHAR
+    jsr GRAPHICS.PUT_CHAR
     
     lda #1 ;white
-    jsr MENU.PUT_COLOR
+    jsr GRAPHICS.PUT_COLOR
   
     rts
     
@@ -108,10 +109,10 @@
     ;it is unbelievably fast to do the maths at coding time, so let's just do that...
     ldx #%00000010
     ldy #%11101111
-    jsr MENU.PUT_CHAR
+    jsr GRAPHICS.PUT_CHAR
     
     lda #0 ;black
-    jsr MENU.PUT_COLOR
+    jsr GRAPHICS.PUT_COLOR
   
     rts
   
@@ -126,6 +127,7 @@
     ldy #.MAIN_MENU.ON_NEW_GAME.FILE_NAME_END - .MAIN_MENU.ON_NEW_GAME.FILE_NAME
     
     ;TODO: call engine loader.
+    jam
     
     rts
     
@@ -138,25 +140,34 @@
     lda #.GAME_STATE.LOAD_MENU
     sta .NEW_GAME_STATE
     
+    ;TODO: remove
+    jam
+    
     rts
     
     
   ;RESOURCES
   .MAIN_MENU:
-    !byte MENU.ELEMENT.BACKGROUND_ROUTINE
+    ;dimensions of the menu options
+    !byte 1, 2 ;change if enabled options have changed.
+  
+    !byte MENU.ELEMENT.BACKGROUND
       !byte <.MAIN_MENU.DRAW_BACKGROUND, >.MAIN_MENU.DRAW_BACKGROUND
       
     ;TODO: logo via ICON
     
     !byte MENU.ELEMENT.TEXT
-      !byte 2, 6, 12, .MAIN_MENU.INSTRUCTIONS - .MAIN_MENU.INSTRUCTIONS.END ;high up on the screen, hugs its width, grey
+      ;text expects a buffer index, not character coordinates.
+      ;we do this at coding time, because it's super fast.
+      !byte %11110010, %00000000, 12, .MAIN_MENU.INSTRUCTIONS - .MAIN_MENU.INSTRUCTIONS.END ;high up on the screen, hugs its width, grey
       .MAIN_MENU.INSTRUCTIONS:
       !text "JOYSTICK (PORT 2) TO NAVIGATE MENUS"
       .MAIN_MENU.INSTRUCTIONS.END:
     
-    !byte MENU.ELEMENT.CHOICE
+    ;choice parameter must be choice count.  if zero, we'll still render it, it just won't be considered for input.
+    !byte MENU.ELEMENT.CHOICE, 1 ;always enabled
       !byte MENU.ELEMENT.TEXT
-        !byte 15, 12, 7, .MAIN_MENU.NEW_GAME - .MAIN_MENU.NEW_GAME.END ;somewhere in the middle of the screen, yellow
+        !byte %11101111, %00000001, 7, .MAIN_MENU.NEW_GAME - .MAIN_MENU.NEW_GAME.END ;somewhere in the middle of the screen, yellow
         .MAIN_MENU.NEW_GAME:
         !text "NEW GAME"
         .MAIN_MENU.NEW_GAME.END:
@@ -167,9 +178,9 @@
       !byte MENU.ELEMENT.CHOICE.ON_SELECT
         !byte <.MAIN_MENU.ON_NEW_GAME, >.MAIN_MENU.ON_NEW_GAME
         
-    !byte MENU.ELEMENT.CHOICE
+    !byte MENU.ELEMENT.CHOICE, 1 ;always enabled
       !byte MENU.ELEMENT.TEXT
-        !byte 15, 18, 7, .MAIN_MENU.LOAD_GAME - .MAIN_MENU.LOAD_GAME.END ;somewhere in the middle of the screen but lower than new game, yellow
+        !byte %11101111, %00000010, 7, .MAIN_MENU.LOAD_GAME - .MAIN_MENU.LOAD_GAME.END ;somewhere in the middle of the screen but lower than new game, yellow
         .MAIN_MENU.LOAD_GAME:
         !text "LOAD GAME"
         .MAIN_MENU.LOAD_GAME.END:
