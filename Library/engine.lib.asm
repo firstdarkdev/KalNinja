@@ -203,8 +203,8 @@
     
     ;buffer bank for mathematic addressing is done via this.
     lda .BUFFER_SWITCH ;consider the switch the high byte of the buffer pointer.
-    ror ;divide by 4.
-    ror 
+    lsr ;divide by 4.
+    lsr 
     ora #%01000000 ;address to bank 2.
     sta .BUFFER_POINTER_HI ;we don't touch lo as other routines can handle that assuming 0 is the bottom.
     
@@ -278,13 +278,6 @@
     ;store parameters
     stx .OPTIONS.LO
     sty .OPTIONS.HI
-    
-    ;fast reset interpreter cursor 
-    txa
-    sta .INTERPRET.NEXT_BYTE + 1
-    tya
-    sta .INTERPRET.NEXT_BYTE + 2
-    
     
     ;reset menu selection
     lda #0
@@ -377,9 +370,9 @@
       
       ;setup decoding tree.
       ;note that this means we only support up to 64 instructions in the menu interpreter.
-      rol ;multiply by four.
-      clc ;forget carries so nothing ends up at bit 0 next time.
-      rol 
+      asl ;multiply by four.
+      asl
+      sbc #4 ;subtract by four because the instruction 0 has no jump table.
       sta .B ;store this for later addition.
       
       ;index where to jump to in the jump table.
@@ -449,7 +442,7 @@
           dec .C ;decrement counter
           beq .INTERPRET.INSTRUCTION.TEXT.EXIT ;the counter hit zero, we are done.
           iny ;increment buffer index.
-          bcc .INTERPRET.INSTRUCTION.TEXT.LOOP
+          bne .INTERPRET.INSTRUCTION.TEXT.LOOP ;increment hit zero?
           inx ;in the case of carry, we need to increment the page as 40 column rows doesn't math evenly all the time.
           jmp .INTERPRET.INSTRUCTION.TEXT.LOOP
         
@@ -540,8 +533,8 @@
     .INTERPRET.NEXT_BYTE:
       lda $0000 ;self modified.
       inc .INTERPRET.NEXT_BYTE + 1 ;increment for next address in the future.
-      bcc .INTERPRET.NEXT_BYTE.EXIT
-      inc .INTERPRET.NEXT_BYTE + 2 ;increment page because carry was set.
+      bne .INTERPRET.NEXT_BYTE.EXIT ;lo has gone back to zero?
+      inc .INTERPRET.NEXT_BYTE + 2 ;increment page because we assume the increment has looped.
     
       .INTERPRET.NEXT_BYTE.EXIT:
       rts
