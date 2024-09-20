@@ -384,11 +384,13 @@
       
       ;index where to jump to in the jump table.
       ;note that the carry operation is only necessary as the compiler cannot guarantee where this instruction ends up.
+      lda #>.INTERPRET.INSTRUCTION.JUMP_TABLE
+      sta .INTERPRET.INSTRUCTION.JUMP + 2 ;increment page because the carry was set when we added the lo byte.
       lda #<.INTERPRET.INSTRUCTION.JUMP_TABLE ;add it to how many bytes we have to look into the table.
       adc .B ;add it to the instruction jump table index
       sta .INTERPRET.INSTRUCTION.JUMP + 1
       bcc .INTERPRET.INSTRUCTION.JUMP ;jump now if we don't have to increment the high byte.  
-      inc .INTERPRET.INSTRUCTION.JUMP + 2 ;increment page because the carry was set when we added the lo byte.
+      inc .INTERPRET.INSTRUCTION.JUMP + 2
       
       .INTERPRET.INSTRUCTION.JUMP:
         jsr $0000 ;self modified
