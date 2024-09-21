@@ -65,6 +65,11 @@
     ldy ENGINE.BUFFER_POINTER_HI
     jsr MEMORY.FILL_PAGES
     
+    lda #0 ;black
+    ldx #4
+    ldy #>ENGINE.COLOR_BACK_BUFFER
+    jsr MEMORY.FILL_PAGES
+    
     ;event responded.
     rts
     
@@ -159,15 +164,15 @@
     !byte MENU.ELEMENT.TEXT
       ;text expects a buffer index, not character coordinates.
       ;we do this at coding time, because it's super fast.
-      !byte %11110010, %00000000, 12, .MAIN_MENU.INSTRUCTIONS - .MAIN_MENU.INSTRUCTIONS.END ;high up on the screen, hugs its width, grey
+      !byte %11110010, %00000000, 12, .MAIN_MENU.INSTRUCTIONS.END - .MAIN_MENU.INSTRUCTIONS ;high up on the screen, hugs its width, grey
       .MAIN_MENU.INSTRUCTIONS:
       !text "JOYSTICK (PORT 2) TO NAVIGATE MENUS"
       .MAIN_MENU.INSTRUCTIONS.END:
     
     ;choice parameter must be choice count.  if zero, we'll still render it, it just won't be considered for input.
-    !byte MENU.ELEMENT.CHOICE, 1 ;always enabled
+    !byte MENU.ELEMENT.CHOICE
       !byte MENU.ELEMENT.TEXT
-        !byte %11101111, %00000001, 7, .MAIN_MENU.NEW_GAME - .MAIN_MENU.NEW_GAME.END ;somewhere in the middle of the screen, yellow
+        !byte %11101111, %00000001, 7, .MAIN_MENU.NEW_GAME.END - .MAIN_MENU.NEW_GAME ;somewhere in the middle of the screen, yellow
         .MAIN_MENU.NEW_GAME:
         !text "NEW GAME"
         .MAIN_MENU.NEW_GAME.END:
@@ -178,9 +183,9 @@
       !byte MENU.ELEMENT.CHOICE.ON_SELECT
         !byte <.MAIN_MENU.ON_NEW_GAME, >.MAIN_MENU.ON_NEW_GAME
         
-    !byte MENU.ELEMENT.CHOICE, 1 ;always enabled
+    !byte MENU.ELEMENT.CHOICE
       !byte MENU.ELEMENT.TEXT
-        !byte %11101111, %00000010, 7, .MAIN_MENU.LOAD_GAME - .MAIN_MENU.LOAD_GAME.END ;somewhere in the middle of the screen but lower than new game, yellow
+        !byte %11011111, %00000010, 7, .MAIN_MENU.LOAD_GAME.END - .MAIN_MENU.LOAD_GAME ;somewhere in the middle of the screen but lower than new game, yellow
         .MAIN_MENU.LOAD_GAME:
         !text "LOAD GAME"
         .MAIN_MENU.LOAD_GAME.END:

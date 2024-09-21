@@ -96,11 +96,11 @@
   .NEXT_COLOR:
     ;reset frame counter
     lda #0
-    sta $02
+    sta .BORDER_FRAME_TIMER
     
     ;we don't need to worry about the top 4 bits as the VIC ignores them anyway
-    inc $03
-    lda $03
+    inc .BORDER_COLOR
+    lda .BORDER_COLOR
     sta VIC.BORDER_COLOR
     
     rts

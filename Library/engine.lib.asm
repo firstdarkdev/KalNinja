@@ -202,7 +202,6 @@
     sta .BUFFER_SWITCH
     
     ;buffer bank for mathematic addressing is done via this.
-    lda .BUFFER_SWITCH ;consider the switch the high byte of the buffer pointer.
     lsr ;divide by 4.
     lsr 
     ora #%01000000 ;address to bank 2.
@@ -330,13 +329,15 @@
     ldy #<.INTERPRET.ON_FIRE_PRESSED
     jsr INPUT.JOY.SUBSCRIBE.FIRE
     
-    ;forget that something was ever selected.
-    lda #0
-    sta .SELECTED
+    ;activate inputs.
+    lda #1
+    sta .INPUT_ACTIVE
+    sta .SELECTION
   
     rts
     
-    
+  .INTERPRET.EXIT:
+    rts
 
   .INTERPRET:
     lda .OPEN
@@ -366,13 +367,13 @@
     .INTERPRET.INSTRUCTION.LOOP:
       ;get instruction byte.
       jsr .INTERPRET.NEXT_BYTE
+      cmp #0 ;because the zero flag is silly when doing an rts.
       beq .INTERPRET.EXIT ;the instruction was END, jump out immediately.
       
       ;setup decoding tree.
       ;note that this means we only support up to 64 instructions in the menu interpreter.
       asl ;multiply by four.
       asl
-      sbc #4 ;subtract by four because the instruction 0 has no jump table.
       sta .B ;store this for later addition.
       
       ;index where to jump to in the jump table.
@@ -388,12 +389,10 @@
       .INTERPRET.INSTRUCTION.JUMP:
         jsr $0000 ;self modified
         jmp .INTERPRET.INSTRUCTION.LOOP ;now get the next instruction.
-        
-      .INTERPRET.EXIT:
-        rts
       
       .INTERPRET.INSTRUCTION.JUMP_TABLE:
         ;align in fours.
+        !byte 0,0,0,0 ;EXIT is not a valid command, so we just pretend it's on the jump table.
         jmp .INTERPRET.INSTRUCTION.TEXT
         !byte 0
         jmp .INTERPRET.INSTRUCTION.ICON
@@ -415,7 +414,7 @@
       ;so the coordinates are expected to be the index instead of an X and Y
       ;this means the programmer must calculate the indexes ahead of time.  
       .INTERPRET.INSTRUCTION.TEXT:
-        ;get cursor index
+        ;get cursor indexrun
         jsr .INTERPRET.NEXT_BYTE ;get lo byte of index.
         tay
         jsr .INTERPRET.NEXT_BYTE ;get hi byte of index.
@@ -463,9 +462,10 @@
         lda .INTERPRET.NEXT_BYTE + 1 ;lo byte
         sta .CHOICE_POINTER.LO
         lda .INTERPRET.NEXT_BYTE + 2 ;hi byte
-        sta MENU.CHOICE_POINTER.HI
+        sta .CHOICE_POINTER.HI
         
-        ;increment choice counter.
+        ;increment choice counter
+        ;TODO: disable choices.
         inc .CURRENT_CHOICE
         
         rts
@@ -525,7 +525,7 @@
         jsr .INTERPRET.GO_POINTER
       
         rts
-        
+ 
       
       
     ;subroutines
@@ -690,6 +690,10 @@
     lda CIA1.DATA_PORT_B
     sta .JOY.IN
     
+    ;invert itself
+    eor .JOY.IN
+    sta .JOY.IN
+    
     rts
       
     
@@ -711,18 +715,18 @@
     lda .JOY.CHANGED.ON
     and #%00000001 ;up 
     bne .JOY.TEST.UP
-    lda .JOY.IN
+    lda .JOY.CHANGED.ON
     and #%00000010 ;down
     bne .JOY.TEST.DOWN
     .JOY.TEST.RIGHT_LEFT_TEST:
-    lda .JOY.IN
+    lda .JOY.CHANGED.ON
     and #%00000100 ;left 
     bne .JOY.TEST.RIGHT
-    lda .JOY.IN
+    lda .JOY.CHANGED.ON
     and #%00001000 ;right
     bne .JOY.TEST.LEFT
     .JOY.TEST.FIRE_TEST:
-    lda .JOY.IN
+    lda .JOY.CHANGED.ON
     and #%00010000 ;fire
     bne .JOY.TEST.FIRE
     
@@ -730,18 +734,18 @@
     lda .JOY.CHANGED.OFF
     and #%00000001 ;up 
     bne .JOY.TEST.UP.RELEASE
-    lda .JOY.IN
+    lda .JOY.CHANGED.OFF
     and #%00000010 ;down
     bne .JOY.TEST.DOWN.RELEASE
     .JOY.TEST.RIGHT_LEFT_TEST.RELEASE:
-    lda .JOY.IN
+    lda .JOY.CHANGED.OFF
     and #%00000100 ;left 
     bne .JOY.TEST.RIGHT.RELEASE
-    lda .JOY.IN
+    lda .JOY.CHANGED.OFF
     and #%00001000 ;right
     bne .JOY.TEST.LEFT.RELEASE
     .JOY.TEST.FIRE_TEST.RELEASE:
-    lda .JOY.IN
+    lda .JOY.CHANGED.OFF
     and #%00010000 ;fire
     bne .JOY.TEST.FIRE.RELEASE
     
