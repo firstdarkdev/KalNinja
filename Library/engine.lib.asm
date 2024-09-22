@@ -276,6 +276,11 @@
     sta .SELECTION
     sta .INPUT_ACTIVE
     
+    ;reset selection cursor.
+    lda #1
+    sta .CHOICE.X
+    sta .CHOICE.Y
+    
     ;menu is open
     lda #1
     sta .OPEN
@@ -292,18 +297,13 @@
     sta .OPTIONS.HI
     sta .OPEN
     
-    ;reset selection cursor.
-    lda #1
-    sta .CHOICE.X
-    sta .CHOICE.Y
-    
     rts
     
     
     
   ;allows the menu to take control of the joystick
   .SUBSCRIBE_INPUT:
-    jsr INPUT.JOY.EVENTS.RESET
+    jsr INPUT.JOY.RESET
   
     ;let's only listen for press, release is ignored.
     ldx #>.INTERPRET.ON_DOWN_PRESSED
@@ -559,12 +559,13 @@
       
     ;go down in the choice grid.
     .INTERPRET.ON_DOWN_PRESSED:
-      ldx .CHOICE.Y
-      inx
-      cpx .CHOICE_DIMENSIONS.Y 
-      bcc .INTERPRET.ON_DOWN_PRESSED.EXIT ;dimension maximum + 1 is out of bounds.
-      ldx #1
-      stx .CHOICE.Y
+      inc .CHOICE.Y
+      lda .CHOICE.Y
+      cmp .CHOICE_DIMENSIONS.Y ;dimension maximum + 1 is out of bounds.
+      beq .INTERPRET.ON_DOWN_PRESSED.EXIT ;choice is allowed to be the same as the coordinates.
+      bcc .INTERPRET.ON_DOWN_PRESSED.EXIT ;check if it's not more than.
+      lda #1
+      sta .CHOICE.Y
     
       .INTERPRET.ON_DOWN_PRESSED.EXIT:
       jsr .INTERPRET.CHANGE_CHOSEN
@@ -583,12 +584,13 @@
       
     ;go right in the choice grid
     .INTERPRET.ON_RIGHT_PRESSED:
-      ldx .CHOICE.X
-      inx
-      cpx .CHOICE_DIMENSIONS.X
-      bcc .INTERPRET.ON_RIGHT_PRESSED.EXIT ;dimension maximum + 1 is out of bounds.
-      ldx #1
-      stx .CHOICE.X
+      inc .CHOICE.X
+      lda .CHOICE.X
+      cmp .CHOICE_DIMENSIONS.X ;dimension maximum + 1 is out of bounds.
+      beq .INTERPRET.ON_DOWN_PRESSED.EXIT ;choice is allowed to be the same as the coordinates.
+      bcc .INTERPRET.ON_DOWN_PRESSED.EXIT ;check if it's not more than.
+      lda #1
+      sta .CHOICE.X
     
       .INTERPRET.ON_RIGHT_PRESSED.EXIT:
       jsr .INTERPRET.CHANGE_CHOSEN
@@ -611,15 +613,16 @@
       
       ;for every index on the coordinate table, increment the selection.
       .INTERPRET.CHANGE_CHOSEN.LOOP:
-        inc .SELECTION
-        dex
+        inc .SELECTION ;next selection id.
+        dex ;count down the row
         bne .INTERPRET.CHANGE_CHOSEN.LOOP ;whilst x has not hit zero...
-        dey
-        beq .INTERPRET.CHANGE_CHOSEN.EXIT ;if all rows have elapsed, we're done.
-        ldx .CHOICE_DIMENSIONS.X ;next row.
+        ldx .CHOICE_DIMENSIONS.X ;reset x counter to a full row length.
+        dey ;count down the column
+        bne .INTERPRET.CHANGE_CHOSEN.LOOP ;whilst y has not hit zero...
     
+      ;all possible menu indices have been scanned.  
       .INTERPRET.CHANGE_CHOSEN.EXIT:
-        lda .SELECTION
+        lda .SELECTION ;copy the result into A.
         rts
       
     ;enforce a selection in the menu based on a chosen choice.
@@ -643,30 +646,30 @@
   .JOY.CHANGED.ON = $28
   .JOY.CHANGED.OFF = $29
   
-  .JOY.EVENTS.RESET:
+  .JOY.RESET:
     ldy #<.DO_NOTHING
     ldx #>.DO_NOTHING
     
-    sty .JOY.TEST.UP + 2
-    stx .JOY.TEST.UP + 1
-    sty .JOY.TEST.DOWN + 2
-    stx .JOY.TEST.DOWN + 1
-    sty .JOY.TEST.RIGHT + 2
-    stx .JOY.TEST.RIGHT + 1
-    sty .JOY.TEST.LEFT + 2
-    stx .JOY.TEST.LEFT + 1
-    sty .JOY.TEST.FIRE + 2
-    stx .JOY.TEST.FIRE + 1
-    sty .JOY.TEST.UP.RELEASE + 2
-    stx .JOY.TEST.UP.RELEASE + 1
-    sty .JOY.TEST.DOWN.RELEASE + 2
-    stx .JOY.TEST.DOWN.RELEASE + 1
-    sty .JOY.TEST.RIGHT.RELEASE + 2
-    stx .JOY.TEST.RIGHT.RELEASE + 1
-    sty .JOY.TEST.LEFT.RELEASE + 2
-    stx .JOY.TEST.LEFT.RELEASE + 1
-    sty .JOY.TEST.FIRE.RELEASE + 2
-    stx .JOY.TEST.FIRE.RELEASE + 1
+    stx .JOY.TEST.UP + 2
+    sty .JOY.TEST.UP + 1
+    stx .JOY.TEST.DOWN + 2
+    sty .JOY.TEST.DOWN + 1
+    stx .JOY.TEST.RIGHT + 2
+    sty .JOY.TEST.RIGHT + 1
+    stx .JOY.TEST.LEFT + 2
+    sty .JOY.TEST.LEFT + 1
+    stx .JOY.TEST.FIRE + 2
+    sty .JOY.TEST.FIRE + 1
+    stx .JOY.TEST.UP.RELEASE + 2
+    sty .JOY.TEST.UP.RELEASE + 1
+    stx .JOY.TEST.DOWN.RELEASE + 2
+    sty .JOY.TEST.DOWN.RELEASE + 1
+    stx .JOY.TEST.RIGHT.RELEASE + 2
+    sty .JOY.TEST.RIGHT.RELEASE + 1
+    stx .JOY.TEST.LEFT.RELEASE + 2
+    sty .JOY.TEST.LEFT.RELEASE + 1
+    stx .JOY.TEST.FIRE.RELEASE + 2
+    sty .JOY.TEST.FIRE.RELEASE + 1
     
     rts
   
@@ -678,13 +681,8 @@
     sta .JOY.OLD
   
     ;instruct CIA1 to get joystick input.
-    lda #0
-    sta CIA1.DATA_DIRECTION_REGISTER_B
-    lda CIA1.DATA_PORT_B
-    sta .JOY.IN
-    
-    ;invert itself
-    eor .JOY.IN
+    lda CIA1.DATA_PORT_A
+    eor #%11111111 ;invert itself
     sta .JOY.IN
     
     rts

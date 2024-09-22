@@ -101,7 +101,7 @@
     lda #">"
     ;it is unbelievably fast to do the maths at coding time, so let's just do that...
     ldx #%00000010
-    ldy #%11101111
+    ldy #%11011111
     jsr GRAPHICS.PUT_CHAR
     
     lda #1 ;white (no multicolor)
@@ -113,7 +113,7 @@
     lda #" "
     ;it is unbelievably fast to do the maths at coding time, so let's just do that...
     ldx #%00000010
-    ldy #%11101111
+    ldy #%11011111
     jsr GRAPHICS.PUT_CHAR
     
     lda #0 ;black
