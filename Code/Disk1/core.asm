@@ -56,9 +56,9 @@
   ;EVENTS
   .MAIN_MENU.DRAW_BACKGROUND:
     lda #0 ;black background
-    ldx #1 ;orange white highlights
-    ldy #9 ;orange shading
-    jsr ENGINE.SET_CHAR_MULTICOLORS
+    ldx #8 ;orange other colour
+    ldy #9 ;brown shading
+    jsr GRAPHICS.SET_CHAR_MULTICOLORS
   
     lda #" "
     ldx #4 ;1KB of memory to fill
@@ -104,7 +104,7 @@
     ldy #%11101111
     jsr GRAPHICS.PUT_CHAR
     
-    lda #1 ;white
+    lda #1 ;white (no multicolor)
     jsr GRAPHICS.PUT_COLOR
   
     rts
@@ -164,7 +164,7 @@
     !byte MENU.ELEMENT.TEXT
       ;text expects a buffer index, not character coordinates.
       ;we do this at coding time, because it's super fast.
-      !byte %11110010, %00000000, 12, .MAIN_MENU.INSTRUCTIONS.END - .MAIN_MENU.INSTRUCTIONS ;high up on the screen, hugs its width, grey
+      !byte %11110010, %00000000, 5, .MAIN_MENU.INSTRUCTIONS.END - .MAIN_MENU.INSTRUCTIONS ;high up on the screen, hugs its width, non-multicolor green
       .MAIN_MENU.INSTRUCTIONS:
       !text "JOYSTICK (PORT 2) TO NAVIGATE MENUS"
       .MAIN_MENU.INSTRUCTIONS.END:
@@ -172,7 +172,7 @@
     ;choice parameter must be choice count.  if zero, we'll still render it, it just won't be considered for input.
     !byte MENU.ELEMENT.CHOICE
       !byte MENU.ELEMENT.TEXT
-        !byte %11101111, %00000001, 7, .MAIN_MENU.NEW_GAME.END - .MAIN_MENU.NEW_GAME ;somewhere in the middle of the screen, yellow
+        !byte %11110001, %00000001, 7, .MAIN_MENU.NEW_GAME.END - .MAIN_MENU.NEW_GAME ;somewhere in the middle of the screen, non-multicolor yellow
         .MAIN_MENU.NEW_GAME:
         !text "NEW GAME"
         .MAIN_MENU.NEW_GAME.END:
@@ -185,7 +185,7 @@
         
     !byte MENU.ELEMENT.CHOICE
       !byte MENU.ELEMENT.TEXT
-        !byte %11011111, %00000010, 7, .MAIN_MENU.LOAD_GAME.END - .MAIN_MENU.LOAD_GAME ;somewhere in the middle of the screen but lower than new game, yellow
+        !byte %11100001, %00000010, 7, .MAIN_MENU.LOAD_GAME.END - .MAIN_MENU.LOAD_GAME ;somewhere in the middle of the screen but lower than new game, non-multicolor yellow
         .MAIN_MENU.LOAD_GAME:
         !text "LOAD GAME"
         .MAIN_MENU.LOAD_GAME.END:

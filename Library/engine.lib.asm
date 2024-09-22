@@ -232,13 +232,6 @@
     
     rts
     
-  ;set the vic registers in an easily accessed manner.
-  .SET_CHAR_MULTICOLORS:
-    sta VIC.BACKGROUND_COLOR
-    stx VIC.CHARSET_MULTICOLOR_1
-    sty VIC.CHARSET_MULTICOLOR_2
-    rts
-    
   
   
 ;PUBLIC SUBMODULES
@@ -875,6 +868,7 @@
   ;A contains the character, X and Y contain the buffer index.
   ;byte index is required in hopes the programmer will do the maths themselves, usually before actually coding.
   .PUT_CHAR:
+    clc ;silly adc logic, if carry is set, 1 is added.  stop that.
     pha ;character to put
     
     txa ;hi byte.
@@ -890,6 +884,7 @@
   ;A contains the character, X and Y contain the buffer index.
   ;byte index is required in hopes the programmer will do the maths themselves, usually before actually coding.
   .PUT_COLOR:
+    clc ;silly adc logic, if carry is set, 1 is added.  stop that.
     pha ;character to put
     
     txa ;hi byte.
@@ -900,6 +895,13 @@
     .PUT_COLOR.ADDRESS:
     sta $0000,Y ;self modifying
   
+    rts
+    
+  ;set the vic registers in an easily accessed manner.
+  .SET_CHAR_MULTICOLORS:
+    sta VIC.BACKGROUND_COLOR
+    stx VIC.CHARSET_MULTICOLOR_1
+    sty VIC.CHARSET_MULTICOLOR_2
     rts
     
     
