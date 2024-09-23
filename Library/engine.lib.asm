@@ -20,7 +20,6 @@
   ;game modes
   .GAME_MODE.MENU = 1
   .GAME_MODE.GAMEPLAY = 2
-  .GAME_MODE.MID_IRQ_GAMEPLAY = 3 ;a lightweight game mode used whilst the KERNAL is busy LOADing.
   
   ;VIC Buffer modes
   .VIC_BUFFER_1 = %10000000
@@ -30,7 +29,7 @@
 
   ;MEMORY MAP
   ;the following areas always have the same space.
-  .SAVE_FILE = $0334
+  .SAVE_FILE = $0200
   .SCRIPT_PRG = $0400
   .CORE_PRG = $2000
   .UI_CHAR = $4000
@@ -94,11 +93,17 @@
     lda #.IRQ_WAIT_FLAGS.CLEARED
     sta .IRQ_WAIT_FLAGS
     
+    ;and start swapping buffers via menu mode
     jsr .SWAP_BUFFERS
+    jsr .GO_MENU_MODE
     
-    ;setup core.
+    ;setup menu
+    jsr MENU.END ;be closed at the start, so the interpreter is not running.
+    
+    ;then run the start script.
     jsr SCRIPT.MENU_START
     
+    ;now start looping
     cli
     
     
@@ -111,8 +116,8 @@
   
     ;only do the level's script and tilemap scrolling if we're in gameplay mode
     lda .GAME_MODE
-    cmp #.GAME_MODE.MENU
-    beq .GAME_LOOP.DRAW_MENU
+    cmp #.GAME_MODE.GAMEPLAY
+    bne .GAME_LOOP.DRAW_MENU
     
     ;TODO back buffer rendering stuff for the map's scrolling
     
@@ -271,15 +276,11 @@
     stx .OPTIONS.LO
     sty .OPTIONS.HI
     
-    ;reset menu selection
-    lda #0
-    sta .SELECTION
-    sta .INPUT_ACTIVE
-    
     ;reset selection cursor.
     lda #1
     sta .CHOICE.X
     sta .CHOICE.Y
+    sta .SELECTION
     
     ;menu is open
     lda #1
@@ -296,6 +297,7 @@
     sta .OPTIONS.LO
     sta .OPTIONS.HI
     sta .OPEN
+    sta .INPUT_ACTIVE
     
     rts
     
@@ -325,7 +327,6 @@
     ;activate inputs.
     lda #1
     sta .INPUT_ACTIVE
-    sta .SELECTION
   
     rts
     
@@ -363,43 +364,23 @@
       cmp #0 ;because the zero flag is silly when doing an rts.
       beq .INTERPRET.EXIT ;the instruction was END, jump out immediately.
       
-      ;setup decoding tree.
-      ;note that this means we only support up to 64 instructions in the menu interpreter.
-      asl ;multiply by four.
-      asl
-      sta .B ;store this for later addition.
+      ;execute instruction
+      ldx #>.INTERPRET.INSTRUCTION.JUMP_TABLE
+      ldy #<.INTERPRET.INSTRUCTION.JUMP_TABLE
+      jsr LOGIC.SWITCH
       
-      ;index where to jump to in the jump table.
-      ;note that the carry operation is only necessary as the compiler cannot guarantee where this instruction ends up.
-      lda #>.INTERPRET.INSTRUCTION.JUMP_TABLE
-      sta .INTERPRET.INSTRUCTION.JUMP + 2 ;increment page because the carry was set when we added the lo byte.
-      lda #<.INTERPRET.INSTRUCTION.JUMP_TABLE ;add it to how many bytes we have to look into the table.
-      adc .B ;add it to the instruction jump table index
-      sta .INTERPRET.INSTRUCTION.JUMP + 1
-      bcc .INTERPRET.INSTRUCTION.JUMP ;jump now if we don't have to increment the high byte.  
-      inc .INTERPRET.INSTRUCTION.JUMP + 2
-      
-      .INTERPRET.INSTRUCTION.JUMP:
-        jsr $0000 ;self modified
-        jmp .INTERPRET.INSTRUCTION.LOOP ;now get the next instruction.
+      ;loop
+      jmp .INTERPRET.INSTRUCTION.LOOP
       
       .INTERPRET.INSTRUCTION.JUMP_TABLE:
-        ;align in fours.
-        !byte 0,0,0,0 ;EXIT is not a valid command, so we just pretend it's on the jump table.
+        !byte 0,0,0 ;EXIT has to kill this routine, so we just pretend it's on the jump table.
         jmp .INTERPRET.INSTRUCTION.TEXT
-        !byte 0
         jmp .INTERPRET.INSTRUCTION.ICON
-        !byte 0
         jmp .INTERPRET.INSTRUCTION.CHOICE
-        !byte 0 
         jmp .INTERPRET.INSTRUCTION.CHOICE.ON_SELECT
-        !byte 0 
         jmp .INTERPRET.INSTRUCTION.CHOICE.ON_CHOSEN
-        !byte 0 
         jmp .INTERPRET.INSTRUCTION.CHOICE.ON_NOT_CHOSEN
-        !byte 0 
         jmp .INTERPRET.INSTRUCTION.BACKGROUND
-        !byte 0
         
         
       
@@ -860,6 +841,33 @@
   ;also used for making an event do nothing.
   .DO_NOTHING:
     rts
+    
+    
+    
+!zone LOGIC
+  .B = $30 ;b register
+  ;A contains state, X contains hi byte of jump table, Y contains lo byte of jump table.
+  ;this routine only supports up to 64 states.
+  .SWITCH:
+    ;setup decoding tree.
+    ;note that this means we only support up to 64 instructions in the menu interpreter.
+    sta .B
+    asl ;multiply by three.
+    adc .B 
+    sta .B ;store this for later addition.
+    
+    ;index where to jump to in the jump table.
+    ;note that the carry operation is only necessary as the compiler cannot guarantee where this instruction ends up.
+    stx .SWITCH.JUMP + 2 ;increment page because the carry was set when we added the lo byte.
+    tya ;add it to how many bytes we have to look into the table.
+    adc .B ;add it to the instruction jump table index
+    sta .SWITCH.JUMP + 1
+    bcc .SWITCH.JUMP ;jump now if we don't have to increment the high byte.  
+    inc .SWITCH.JUMP + 2 ;page boundary crossed.
+    
+    .SWITCH.JUMP:
+      jsr $0000 ;self modified
+      rts
   
 
 !zone GRAPHICS

@@ -7,15 +7,16 @@
 
 !zone CORE
 
-  .GAME_STATE = $FB
-  .NEW_GAME_STATE = $FC
+  .MENU_STATE = $FB
+  .NEW_MENU_STATE = $FC
   
-  .GAME_STATE.MAIN_MENU = 1
-  .GAME_STATE.SAVE_MENU = 2
-  .GAME_STATE.LOAD_MENU = 3
-  .GAME_STATE.PAUSE_MENU = 4
-  .GAME_STATE.TRAINING_VOID = 5
-  .GAME_STATE.GAMEPLAY = 6
+  .MENU_STATE.MAIN_MENU = 0
+  .MENU_STATE.SAVE_MENU = 1
+  .MENU_STATE.LOAD_MENU = 2
+  .MENU_STATE.CUTSCENES = 3
+  .MENU_STATE.HINTS = 4
+  .MENU_STATE.HUD = 5
+  .MENU_STATE.HUD.CONTROLLED = 6
 
   ;SCRIPTS
   * = SCRIPT.MENU_START
@@ -25,36 +26,97 @@
     ldx #>.LOOP
     jsr SCRIPT.REGISTER_MAIN_LOOP
     
-    ;setup main menu
-    ldx #<.MAIN_MENU
-    ldy #>.MAIN_MENU
-    jsr MENU.NEW
-    jsr MENU.SUBSCRIBE_INPUT
-    
     ;initialize the game state machine
-    lda #.GAME_STATE.MAIN_MENU
-    sta .GAME_STATE
-    sta .NEW_GAME_STATE
-    
-    ;sei and cli is already done in MENU_START, so no need to control interrupt here again.
-    jsr ENGINE.GO_MENU_MODE
+    lda #.MENU_STATE.MAIN_MENU
+    sta .NEW_MENU_STATE ;force the loop state machine to respond.
+    lda #$ff ;null state
+    sta .MENU_STATE
     
     ;return to engine
     rts
     
   .LOOP:
   
-    ;TODO game state machine
-
-    ;return to engine
-    rts
+    ;detect a state change.
+    lda .NEW_MENU_STATE
+    cmp .MENU_STATE
+    beq .LOOP.NO_STATE_CHANGE
+    sta .MENU_STATE ;and update it.
+    
+    ;get the address for the next menu to render.
+    ldx #>.LOOP.MENU_STATE.JUMP_TABLE
+    ldy #<.LOOP.MENU_STATE.JUMP_TABLE
+    jsr LOGIC.SWITCH
+    
+    ;set the menu submodule to use the selected data.
+    jsr MENU.NEW
+    jsr ENGINE.GO_MENU_MODE ;and switch to menu mode to render it.
+    
+    ;and exit.
+    .LOOP.NO_STATE_CHANGE:
+    
+    
+    rts ;return to engine
+    
+    
     
   ;SUBROUTINES
 
+  
     
 
   ;EVENTS
-  .MAIN_MENU.DRAW_BACKGROUND:
+  
+    
+  
+  .LOOP.MENU_STATE.MAIN_MENU:
+    jsr MENU.SUBSCRIBE_INPUT ;this menu takes control of input.
+    ldx #<.MAIN_MENU
+    ldy #>.MAIN_MENU
+    
+    rts
+  
+  .LOOP.MENU_STATE.SAVE_MENU:
+    jsr MENU.SUBSCRIBE_INPUT ;this menu takes control of input.
+    ldx #<.SAVE_MENU
+    ldy #>.SAVE_MENU
+    
+    rts
+    
+  .LOOP.MENU_STATE.LOAD_MENU:
+    jsr MENU.SUBSCRIBE_INPUT ;this menu takes control of input.
+    ldx #<.LOAD_MENU
+    ldy #>.LOAD_MENU
+    
+    rts
+  
+  .LOOP.MENU_STATE.CUTSCENES:
+    jsr MENU.SUBSCRIBE_INPUT ;this menu takes control of input.
+    ldx #<.CUTSCENE_MENU
+    ldy #>.CUTSCENE_MENU
+    
+    rts
+    
+  .LOOP.MENU_STATE.HINTS:
+    jsr MENU.SUBSCRIBE_INPUT ;this menu takes control of input.
+    ldx #<.HINTS_MENU
+    ldy #>.HINTS_MENU
+    
+    rts
+    
+  .LOOP.MENU_STATE.HUD.CONTROLLED:
+    ;only let the HUD take input control in a certain menu state.
+    jsr MENU.SUBSCRIBE_INPUT
+    
+  .LOOP.MENU_STATE.HUD:
+    ldx #<.HUD_MENU
+    ldy #>.HUD_MENU 
+    
+    rts
+  
+  
+  
+  .FULL_SCREEN_MENU.DRAW_BACKGROUND:
     lda #0 ;black background
     ldx #8 ;orange other colour
     ldy #9 ;brown shading
@@ -123,32 +185,32 @@
   
     
   .MAIN_MENU.ON_NEW_GAME:
-    ;set the engine to "load level mode" so it will escape correctly when the engine has stopped loading.
-    lda #.GAME_STATE.TRAINING_VOID
-    sta .NEW_GAME_STATE
-    
-    lda #<.MAIN_MENU.ON_NEW_GAME.FILE_NAME
-    ldx #>.MAIN_MENU.ON_NEW_GAME.FILE_NAME
-    ldy #.MAIN_MENU.ON_NEW_GAME.FILE_NAME_END - .MAIN_MENU.ON_NEW_GAME.FILE_NAME
-    
-    ;TODO: call engine loader.
     jam
+    ;TODO: reset save file.
+  
+    ;TODO: load the tutorial level immediately. 
     
     rts
-    
-    .MAIN_MENU.ON_NEW_GAME.FILE_NAME:
-      !text "INTRO,PRG"
-    .MAIN_MENU.ON_NEW_GAME.FILE_NAME_END:
     
   .MAIN_MENU.ON_LOAD_GAME:
     ;change to the load menu
-    lda #.GAME_STATE.LOAD_MENU
-    sta .NEW_GAME_STATE
-    
-    ;TODO: remove
-    jam
+    lda #.MENU_STATE.LOAD_MENU
+    sta .NEW_MENU_STATE
     
     rts
+    
+    
+    
+  ;SWITCHES
+  .LOOP.MENU_STATE.JUMP_TABLE:
+    jmp .LOOP.MENU_STATE.MAIN_MENU
+    jmp .LOOP.MENU_STATE.SAVE_MENU
+    jmp .LOOP.MENU_STATE.LOAD_MENU
+    jmp .LOOP.MENU_STATE.CUTSCENES
+    jmp .LOOP.MENU_STATE.HINTS
+    jmp .LOOP.MENU_STATE.HUD
+    jmp .LOOP.MENU_STATE.HUD.CONTROLLED
+    
     
     
   ;RESOURCES
@@ -157,7 +219,7 @@
     !byte 1, 2 ;change if enabled options have changed.
   
     !byte MENU.ELEMENT.BACKGROUND
-      !byte <.MAIN_MENU.DRAW_BACKGROUND, >.MAIN_MENU.DRAW_BACKGROUND
+      !byte <.FULL_SCREEN_MENU.DRAW_BACKGROUND, >.FULL_SCREEN_MENU.DRAW_BACKGROUND
       
     ;TODO: logo via ICON
     
@@ -197,6 +259,46 @@
         !byte <.MAIN_MENU.ON_LOAD_GAME, >.MAIN_MENU.ON_LOAD_GAME
       
     !byte MENU.ELEMENT.END
+    
+  ;TODO
+  .LOAD_MENU:
+    !byte 1, 1
+    
+    !byte MENU.ELEMENT.BACKGROUND
+      !byte <.FULL_SCREEN_MENU.DRAW_BACKGROUND, >.FULL_SCREEN_MENU.DRAW_BACKGROUND
+      
+    !byte MENU.ELEMENT.END
+  
+  ;TODO
+  .SAVE_MENU:
+    !byte 1, 1
+    
+    !byte MENU.ELEMENT.BACKGROUND
+      !byte <.FULL_SCREEN_MENU.DRAW_BACKGROUND, >.FULL_SCREEN_MENU.DRAW_BACKGROUND
+      
+    !byte MENU.ELEMENT.END
+  
+  ;TODO
+  .CUTSCENE_MENU:
+    !byte 1, 1
+    
+    !byte MENU.ELEMENT.BACKGROUND
+      !byte <.FULL_SCREEN_MENU.DRAW_BACKGROUND, >.FULL_SCREEN_MENU.DRAW_BACKGROUND
+      
+    !byte MENU.ELEMENT.END
+  
+  ;TODO
+  .HINTS_MENU:
+    !byte 1, 1
+    
+    !byte MENU.ELEMENT.BACKGROUND
+      !byte <.FULL_SCREEN_MENU.DRAW_BACKGROUND, >.FULL_SCREEN_MENU.DRAW_BACKGROUND
+      
+    !byte MENU.ELEMENT.END
+  
+  ;TODO
+  .HUD_MENU:
+    ;TODO
 
   * = ENGINE.UI_CHAR
 
