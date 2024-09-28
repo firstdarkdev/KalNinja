@@ -1,4 +1,14 @@
-**KalNinja is GNU GPLv3**
+**KalNinja's folders in Code, Library, Compiler and Include is GNU GPLv3**
+
+**This license is hereby NOT granted to any binary art or sound assets included in the folders Characters, Graphics, Maps, Sounds and Sprites.**
+**These assets are NOT code and thus are not covered by the GPLv3.**
+**The assets in those folders is Copyright (C) 2024 Colin James Wood, All Rights Reserved.**
+
+**I hereby give explicit permission to use the assets you find in those folders specifically hosted on this repository and any forks or clones, as they are placeholder assets.  However, you will find that builds of the game elsewhere (such as itch.io and steam) contain completely different art assets.  Because they were built into the game using replaceements for the above files, they are NOT covered by GPLv3.**
+
+**TL;DR: to create your own game out of the code this repository, you may use the placeholder assets provided in this source.**
+**It is then recommended to create your own art and sounds afterward.**
+**My own publications of the game online will contain Copyrighted art assets, so redistribution of those builds is prohibited.**
 
 GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007
