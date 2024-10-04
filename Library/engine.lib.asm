@@ -154,10 +154,9 @@
     ;TODO: sort sprites now, hopefully fast enough that the colour buffer remains in time.
     
     ;flip colour buffer
-    lda #>.COLOR_BACK_BUFFER
-    ldx #4 ;all 1K of it.
+    ldx #>.COLOR_BACK_BUFFER
     ldy #$d8 ;into color ram pages.
-    jsr MEMORY.COPY_PAGES
+    jsr MEMORY.COPY_4_PAGES
     
     ;reset wait flag and loop the engine.
     lda #.IRQ_WAIT_FLAGS.CLEARED
@@ -913,47 +912,63 @@
     
 
 !zone MEMORY
-  ;Fills 256 byte pages with the same character.  As fast as possible.
-  ;Accumulator contains byte to fill, X contains page count to do, Y contains page high byte pointer.
-  .FILL_PAGES:
+  ;Fills 1K with the same character.  As fast as possible (6,664 cycles)
+  ;Accumulator contains byte to fill, Y contains page high byte pointer.
+  .FILL_4_PAGES:
     sty .FILL_PAGES.LOOP + 2 ;store page high byte.
+    iny
+    sty .FILL_PAGES.LOOP + 5 ;next page.
+    iny
+    sty .FILL_PAGES.LOOP + 8
+    iny
+    sty .FILL_PAGES.LOOP + 11
     
     ldy #0
     
     .FILL_PAGES.LOOP:
       sta $0000,Y ;self modified at the start.
+      sta $0000,Y ;self modified at the start.
+      sta $0000,Y ;self modified at the start.
+      sta $0000,Y ;self modified at the start.
       iny
       bne .FILL_PAGES.LOOP
+
+      ;all pages done
+      rts 
     
-      dex
-      beq .FILL_PAGES.DONE ;all pages done.
-      inc .FILL_PAGES.LOOP + 2 ;next page
-      jmp .FILL_PAGES.LOOP
-    
-    .FILL_PAGES.DONE:
-      rts
-    
-  ;Copies 256 byte pages.  As fast as possible.
-  ;Accumulator contains page to copy, X contains page count to do, Y contains page destination.
-  .COPY_PAGES:
-    sta .COPY_PAGES.LOOP + 2
+  ;Copies 1K.  As fast as possible (10,806 cycles).
+  ;X contains page to copy, Y contains page destination.
+  .COPY_4_PAGES:
+    stx .COPY_PAGES.LOOP + 2
     sty .COPY_PAGES.LOOP + 5  
+    inx
+    iny
+    stx .COPY_PAGES.LOOP + 8 ;next page
+    sty .COPY_PAGES.LOOP + 11 ;next page
+    inx
+    iny
+    stx .COPY_PAGES.LOOP + 14
+    sty .COPY_PAGES.LOOP + 17
+    inx
+    iny 
+    stx .COPY_PAGES.LOOP + 20
+    sty .COPY_PAGES.LOOP + 23
   
     ldy #0
   
     .COPY_PAGES.LOOP:
       lda $0000,Y ;self modified
       sta $0000,Y ;self modified
+      lda $0000,Y ;self modified
+      sta $0000,Y ;self modified
+      lda $0000,Y ;self modified
+      sta $0000,Y ;self modified
+      lda $0000,Y ;self modified
+      sta $0000,Y ;self modified
       iny
       bne .COPY_PAGES.LOOP ;branch if y has not returned to zero.
-      
-      dex
-      beq .COPY_PAGES.DONE ;all pages done
-      inc .COPY_PAGES.LOOP + 2 ;change page
-      inc .COPY_PAGES.LOOP + 5 ;change page
-      jmp .COPY_PAGES.LOOP
     
-    .COPY_PAGES.DONE:
+      ;all pages done
       rts
      
       

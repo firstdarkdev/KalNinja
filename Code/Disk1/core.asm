@@ -123,14 +123,12 @@
     jsr GRAPHICS.SET_CHAR_MULTICOLORS
   
     lda #" "
-    ldx #4 ;1KB of memory to fill
     ldy ENGINE.BUFFER_POINTER_HI
-    jsr MEMORY.FILL_PAGES
+    jsr MEMORY.FILL_4_PAGES
     
     lda #0 ;black
-    ldx #4
     ldy #>ENGINE.COLOR_BACK_BUFFER
-    jsr MEMORY.FILL_PAGES
+    jsr MEMORY.FILL_4_PAGES
     
     ;event responded.
     rts
