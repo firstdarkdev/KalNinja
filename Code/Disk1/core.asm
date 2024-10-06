@@ -19,12 +19,12 @@
   .MENU_STATE.HUD.CONTROLLED = 6
 
   ;SCRIPTS
-  * = SCRIPT.MENU_START
+  * = ENGINE.MENU_START
     
     ;setup menu loop script
     lda #<.LOOP
     ldx #>.LOOP
-    jsr SCRIPT.REGISTER_MAIN_LOOP
+    jsr ENGINE.SUBSCRIBE.MAIN_LOOP
     
     ;initialize the game state machine
     lda #.MENU_STATE.MAIN_MENU
