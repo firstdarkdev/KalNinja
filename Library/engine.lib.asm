@@ -248,11 +248,11 @@
   
   
 ;SUBMODULES
-  !source "../Include/menu.asm", once
-  !source "../Include/input.asm", once
-  !source "../Include/logic.asm", once
-  !source "../Include/graphics.asm", once
-  !source "../Include/memory.asm", once
+  !source "../Include/Engine/menu.asm", once
+  !source "../Include/Engine/input.asm", once
+  !source "../Include/Engine/logic.asm", once
+  !source "../Include/Engine/graphics.asm", once
+  !source "../Include/Engine/memory.asm", once
  
 !zone ENGINE
   .MENU_START:
